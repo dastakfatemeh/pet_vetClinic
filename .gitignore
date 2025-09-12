@@ -1,5 +1,5 @@
-# Ignore model files
-hf_f.py
+# Ignore model files and sensitive data
+HF_t.py
 model/classification_ownernotes/
 *.safetensors
 *.bin
