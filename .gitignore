@@ -1,5 +1,28 @@
 # Ignore model files and sensitive data
 HF_t.py
+
+# Ignore all model-related folders
+model/
+model_*/
+model_calssification/
+*/model_*/
+*/model/
+
+# Ignore MLflow runs
+mlruns/
+*/mlruns/
+
+# Ignore model binary files
+*.safetensors
+*.bin
+*.txt
+*.pth
+*.pt
+*.ckpt
+*.model model files and sensitive data
+HF_t.py
+mlruns/
+/model calssification/
 model/classification_ownernotes/
 *.safetensors
 *.bin
