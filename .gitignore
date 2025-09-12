@@ -1,4 +1,5 @@
 # Ignore model files
+hf_f.py
 model/classification_ownernotes/
 *.safetensors
 *.bin
