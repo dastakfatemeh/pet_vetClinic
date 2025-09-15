@@ -12,6 +12,10 @@ model_calssification/
 mlruns/
 */mlruns/
 
+# Ignore environment files
+venv/
+*/venv/
+
 # Ignore model binary files
 *.safetensors
 *.bin

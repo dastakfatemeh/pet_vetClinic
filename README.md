@@ -48,7 +48,7 @@ This project implements a comprehensive pet health analysis system with two main
 - Hugging Face Hub integration for model hosting
 
 ## Requirements
-- Python 3.x
+- Python 3.11
 - PyTorch
 - Transformers
 - Pandas
@@ -58,6 +58,10 @@ This project implements a comprehensive pet health analysis system with two main
 - huggingface-hub
 - hf_xet
 - qdrant-clients
+- sentencepiece
+- ipykernel
+- pip install torch torchvision torchaudio
+
 
 ## Model Performance
 The model is evaluated on a validation set with metrics including:
