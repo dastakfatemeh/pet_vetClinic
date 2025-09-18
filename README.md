@@ -138,6 +138,26 @@ To vectorize veterinary clinical notes and set up similarity search, use `Vector
 
 Note: Ensure Qdrant is running (see Installation section) before working with `Vector_DB.ipynb`.
 
+### 3. Running the Application
+To start the FastAPI application, run the following command in your terminal:
+
+```bash (python environemt)
+python -m uvicorn AI_Agents:app --reload
+```
+
+Once you see the "Application startup complete" message, you can interact with the API in two ways:
+
+1. **Using the Interactive API Documentation**:
+   - Open your browser and go to [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+   - Use the interactive interface to input your pet's symptoms and get predictions
+
+2. **Using Command Line (curl)**:
+   ```bash
+   curl -X POST http://127.0.0.1:8000/converse -H "Content-Type: application/json" -d "{\"user_input\": \"My dog has been scratching a lot lately.\"}"
+   ```
+
+The application will return the predicted condition and similar cases from the database.
+
 ## Troubleshooting
 
 ### Qdrant Setup Issues
