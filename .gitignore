@@ -25,6 +25,8 @@ venv/
 *.ckpt
 *.model model files and sensitive data
 HF_t.py
+HF_t.*/
+/HF_t.*/
 mlruns/
 /model calssification/
 model/classification_ownernotes/
