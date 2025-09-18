@@ -60,7 +60,9 @@ This project implements a comprehensive pet health analysis system with two main
 - qdrant-clients
 - sentencepiece
 - ipykernel
-- pip install torch torchvision torchaudio
+- torch torchvision torchaudio
+- fastapi
+- python -m pip install "uvicorn[standard]"
 
 
 ## Model Performance
