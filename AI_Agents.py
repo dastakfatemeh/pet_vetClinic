@@ -11,6 +11,9 @@ from qdrant_client import QdrantClient
 import torch.nn.functional as F
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import  Filter, FieldCondition, MatchValue
+from enum import Enum
+from fastapi.responses import JSONResponse
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -226,3 +229,25 @@ async def converse(input_data: SymptomInput):
     except Exception as e:
         logger.error(f"Error in /converse endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class AppointmentResponseEnum(str, Enum):
+    yes = "yes"
+    no = "no"
+
+class AppointmentResponse(BaseModel):
+    wants_appointment: AppointmentResponseEnum
+
+@app.post("/appointment_response")
+async def appointment_response(response: AppointmentResponse):
+    if response.wants_appointment == AppointmentResponseEnum.yes:
+        # Logic to handle confirmed appointment
+        calendar_link = "https://calendly.com/dastakfatemeh/vet_consultant"
+        return JSONResponse(
+            content={
+                "message": "Great! Please use the following link to schedule your appointment.",
+                "calendar_url": calendar_link
+            }
+        )
+    else:
+        # User declined appointment
+        return {"message": "Thanks for reaching out. If you have any more questions or need assistance in the future, feel free to contact us. Take care!"}
