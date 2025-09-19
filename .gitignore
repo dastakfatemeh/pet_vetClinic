@@ -37,7 +37,7 @@ model/classification_ownernotes/
 # Ignore cache and temporary files
 __pycache__/
 *.py[cod]
-*$py.class
+*$py.classs
 
 # Ignore logs
 logs/
@@ -48,3 +48,7 @@ logs/
 
 # Ignore results directory
 results/
+
+#Ignore http files
+*.http
+
