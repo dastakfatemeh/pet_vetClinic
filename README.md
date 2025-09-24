@@ -3,8 +3,11 @@
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-latest-green)
 ![Tests](https://img.shields.io/badge/tests-passing-brightgreen)
+![Flake8](https://img.shields.io/badge/flake8-passing-brightgreen)
 ![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-enabled-blue)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
+
+<p align="center">Built with ❤️ and GitHub Copilot</p>
 
 > AI-powered veterinary system for symptom analysis, case retrieval, and patient communication
 

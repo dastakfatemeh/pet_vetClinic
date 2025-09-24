@@ -70,6 +70,7 @@ async def shutdown():
             await client.close()
         
         # Clear agent references
+        client=None
         classification_agent = None
         retrieval_agent = None
         communication_agent = None
