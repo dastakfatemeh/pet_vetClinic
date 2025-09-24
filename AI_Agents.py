@@ -2,7 +2,7 @@ import logging
 import re
 import torch
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel,validator
 from huggingface_hub import login
 from HF_t import hf_token_read
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
@@ -14,6 +14,7 @@ from qdrant_client.http.models import  Filter, FieldCondition, MatchValue
 from enum import Enum
 from fastapi.responses import JSONResponse
 from Agents import ClassificationAgent, RetrievalAgent, CommunicationAgent
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +63,8 @@ async def startup_event():
 
     # Initialize agent instances using loaded models
     classification_agent = ClassificationAgent(classification_model, classification_tokenizer, device)
-    retrieval_agent = RetrievalAgent(vetbert_model, vetbert_tokenizer, device, client, "vet_notes")
+    retrieval_agent = RetrievalAgent(vetbert_model, vetbert_tokenizer, device, client, collection_name, max_neg=4,  # Maximum hard negatives to select
+    percentage_margin=0.95)  # Threshold for negative selection
     communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
     
     logger.info("All models and clients initialized.")
@@ -71,12 +73,19 @@ async def startup_event():
 @app.get("/ping")
 async def ping():
     return {"message": "pong"}
+
 # Add confidence threshold constant
 CONFIDENCE_THRESHOLD = 0.8
+SIMILARITY_THRESHOLD = 0.8
+MAX_CASES = 3
+TOP_K_CANDIDATES = 10  # For hard-negative mining
+POSITIVE_PERCENTAGE = 0.3  # Keep top 30% as positives
 
 @app.post("/converse")
 async def converse(input_data: SymptomInput):
-    """Process user query and return appropriate response based on confidence level"""
+    """Process user query and return appropriate response based on confidence level
+    Process user query with hard-negative mining for better results"""
+    
     user_input = input_data.user_input
     
     try:
@@ -99,20 +108,45 @@ async def converse(input_data: SymptomInput):
 
         # Step 2: If confidence is high enough, proceed with retrieval and explanation
         try:
-            similar_cases = retrieval_agent.find_similar_cases(user_input, condition_name)
-            conversation_output = communication_agent.output_vet_assistant(similar_cases)
+            similar_cases = retrieval_agent.find_similar_cases(user_input, condition_name, limit=3)
+            filtered_cases = [
+                case for case in similar_cases 
+                if case.score >= SIMILARITY_THRESHOLD
+            ]
+            # If no cases meet similarity threshold
+            if not filtered_cases:
+                return {
+                    "condition_identified": condition_name,
+                    "confidence_score": confidence,
+                    "similar_cases_count": 0,
+                    "conversation": (
+                        "While I've identified the potential condition, I don't have sufficiently similar cases "
+                        "to provide specific guidance. I recommend scheduling an appointment with our veterinary "
+                        "team for a proper examination. Would you like to schedule an appointment? (please reply with yes/no)"
+                    )
+                }
+            conversation_output = communication_agent.output_vet_assistant(filtered_cases)
         except Exception as e:
             logger.error(f"Error in retrieval or communication: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail="Failed to process veterinary information"
             )
-
+        if filtered_cases:
+           # Add similarity scores to the response
+            similar_cases_info = [
+                {
+                    "score": case.score,
+                    "text": case.payload['text']
+                } for case in filtered_cases
+            ]
+      
         # Step 3: Return complete response
         response = {
             "condition_identified": condition_name,
             "confidence_score": confidence,
             "similar_cases_count": len(similar_cases),
+            "similar_cases": similar_cases_info,
             "conversation": conversation_output
         }
         return response
@@ -131,17 +165,34 @@ class AppointmentResponseEnum(str, Enum):
 class AppointmentResponse(BaseModel):
     wants_appointment: AppointmentResponseEnum
 
+@validator('wants_appointment')
+def validate_response(cls, v):
+        # Convert to lowercase for case-insensitive comparison
+        response = v.lower().strip()
+        if response not in ['yes', 'no']:
+            raise ValueError(
+                "Invalid response. Please answer with 'yes' or 'no'."
+            )
+        return response
+
 @app.post("/appointment_response")
 async def appointment_response(response: AppointmentResponse):
-    if response.wants_appointment == AppointmentResponseEnum.yes:
-        # Logic to handle confirmed appointment
-        calendar_link = "https://calendly.com/dastakfatemeh/vet_consultant"
-        return JSONResponse(
-            content={
-                "message": "Great! Please use the following link to schedule your appointment.",
-                "calendar_url": calendar_link
-            }
+    try:
+        if response.wants_appointment == AppointmentResponseEnum.yes:
+            # Logic to handle confirmed appointment
+            calendar_link = "https://calendly.com/fhosseinzadh/30min"
+            return JSONResponse(
+                content={
+                    "message": "Great! Please use the following link to schedule your appointment.",
+                    "calendar_url": calendar_link
+                }
+            )
+        else:
+            # User declined appointment
+            return {"message": "Thanks for reaching out. If you have any more questions or need assistance in the future, feel free to contact us. Take care!"}
+    except Exception as e:
+        logger.error(f"Error processing appointment response: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while processing your response"
         )
-    else:
-        # User declined appointment
-        return {"message": "Thanks for reaching out. If you have any more questions or need assistance in the future, feel free to contact us. Take care!"}

@@ -54,6 +54,8 @@ class CommunicationAgent:
             return "No cases to explain."
 
         try:
+            # Sort cases by score in descending order
+            sorted_cases = sorted(cases, key=lambda x: x.score, reverse=True)
             finding_s = ''
             for i, case in enumerate(cases):
                 if 'text' not in case.payload:
@@ -90,10 +92,10 @@ class CommunicationAgent:
                         skip_special_tokens=True
                     )
                     
-                    finding_s = (
+                    finding_s += (
                         f"{len(cases)-i}.{case.payload['text']}\n"
                         f"{decoded_output}\n"
-                    ) + finding_s
+                    )
                     
                 except Exception as e:
                     logger.error(f"Failed to process case {i}: {e}")

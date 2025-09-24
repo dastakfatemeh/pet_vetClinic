@@ -13,3 +13,12 @@ class SearchOperationError(AgentError):
 class DatabaseConnectionError(AgentError):
     """Raised when database connection fails."""
     pass
+
+class PredictionError(AgentError):
+    """Raised when model prediction or condition identification fails."""
+    pass
+
+
+class CommunicationError(AgentError):
+    """Raised when text generation or explanation fails."""
+    pass

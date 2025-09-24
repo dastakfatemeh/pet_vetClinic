@@ -6,16 +6,16 @@ from .exceptions import (
     AgentError,
     AgentInitializationError,
     SearchOperationError,
-    DatabaseConnectionError
+    DatabaseConnectionError,
+    PredictionError,
+    CommunicationError
 )
 
 __all__ = [
-    'ClassificationAgent',
-    'RetrievalAgent',
-    'CommunicationAgent',
-    'VetBERTMixin',
     'AgentError',
     'AgentInitializationError',
     'SearchOperationError',
-    'DatabaseConnectionError'
+    'DatabaseConnectionError',
+    'PredictionError',
+    'CommunicationError'
 ]
