@@ -1,58 +1,41 @@
-# Ignore model files and sensitive data
-HF_t.py
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+ENV/
 
-# Ignore all model-related folders
+# Model files and sensitive data
+HF_t.py
 model/
 model_*/
 model_calssification/
-*/model_*/
-*/model/
-
-# Ignore MLflow runs
 mlruns/
-*/mlruns/
 
-# Ignore environment files
-venv/
-*/venv/
-
-# Ignore model binary files
+# Binary files
 *.safetensors
 *.bin
-!requirements.txt 
-*.txt
 *.pth
 *.pt
 *.ckpt
-*.model model files and sensitive data
-HF_t.py
-HF_t.*/
-/HF_t.*/
-mlruns/
-/model calssification/
-model/classification_ownernotes/
-*.safetensors
-*.bin
+*.model
+
+# Text files except requirements.txt
 *.txt
+!requirements.txt
 
-# Ignore cache and temporary files
-__pycache__/
-*.py[cod]
-*$py.classs
+# IDE specific
+.vscode/
+.idea/
+*.swp
+.DS_Store
 
-# Ignore logs
-logs/
-*.log
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
 
-# Ignore jupyter notebook checkpoints
-.ipynb_checkpoints/
-
-# Ignore results directory
-results/
-
-#Ignore http files
+# Other
 *.http
-
-#Ignore README_myself
 README_myself.md
-*.README_myself.md

@@ -1,0 +1,15 @@
+fastapi==0.109.1
+uvicorn==0.36.0
+pydantic==2.6.1
+qdrant-client==1.7.0
+transformers==4.37.2
+torch==2.2.0
+python-multipart==0.0.9
+huggingface-hub==0.20.3
+pytest==8.0.0
+pytest-asyncio==0.23.5
+httpx==0.26.0
+typing-extensions==4.15.0
+numpy==1.26.3
+black==24.1.1
+flake8==7.0.0
