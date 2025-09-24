@@ -8,10 +8,11 @@ from .exceptions import AgentInitializationError, PredictionError
 # Configure logging
 logger = logging.getLogger(__name__)
 
+
 class ClassificationAgent:
     """
     Agent responsible for classifying pet health conditions from provided observation by pet owner.
-    
+
     Uses a fine-tuned model (based on a pre-trained transformer) model to classify pet symptoms into predefined categories.
     Handles both prediction and condition identification with proper error handling.
     """
@@ -33,19 +34,18 @@ class ClassificationAgent:
             self.device = device
             self.model = model.to(self.device)
             self.tokenizer = tokenizer
-            
+
             # Mapping of numeric labels to condition names
             self.label_to_condition = {
                 0: "digestive issues",
                 1: "ear infections",
                 2: "mobility problems",
                 3: "parasites",
-                4: "skin irritations"
+                4: "skin irritations",
             }
         except Exception as e:
             logger.error(f"Failed to initialize ClassificationAgent: {e}")
             raise AgentInitializationError("Failed to initialize classification agent")
-
 
     def predict_condition(self, user_input: str) -> Tuple[float, float]:
         """
@@ -67,29 +67,31 @@ class ClassificationAgent:
 
         try:
             self.model.eval()
-            
+
             # Tokenize input with safety checks
             inputs = self.tokenizer(
                 user_input,
                 return_tensors="pt",
                 padding=True,
                 truncation=True,
-                max_length=512
+                max_length=512,
             )
-            
+
             # Move inputs to correct device
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            
+
             # Use autocast for better GPU memory efficiency
             with torch.no_grad(), autocast(enabled=torch.cuda.is_available()):
                 outputs = self.model(**inputs)
                 logits = outputs.logits
                 probs = F.softmax(logits, dim=-1)
                 confidence_score, pred_label = torch.max(probs, dim=1)
-                
-            logger.info(f"Successfully generated prediction with confidence {confidence_score.item():.4f}")
+
+            logger.info(
+                f"Successfully generated prediction with confidence {confidence_score.item():.4f}"
+            )
             return pred_label.item(), confidence_score.item()
-            
+
         except torch.cuda.OutOfMemoryError:
             logger.error("GPU memory exhausted during prediction")
             raise PredictionError("GPU memory error during prediction")
@@ -116,20 +118,21 @@ class ClassificationAgent:
         try:
             # Get numeric prediction
             predicted_label, confidence = self.predict_condition(user_input)
-            
+
             # Convert to condition name with fallback
             condition_name = self.label_to_condition.get(
-                predicted_label, 
-                "unknown condition"
+                predicted_label, "unknown condition"
             )
-            
+
             # Validate confidence score
             if not 0 <= confidence <= 1:
                 logger.warning(f"Unusual confidence score: {confidence}")
-            
-            logger.info(f"Identified condition: {condition_name} with confidence: {confidence:.4f}")
+
+            logger.info(
+                f"Identified condition: {condition_name} with confidence: {confidence:.4f}"
+            )
             return condition_name, confidence
-            
+
         except Exception as e:
             logger.exception(f"Error in condition identification: {str(e)}")
             raise RuntimeError(f"Condition identification failed: {str(e)}") from e

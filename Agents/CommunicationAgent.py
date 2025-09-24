@@ -6,10 +6,11 @@ from .exceptions import AgentInitializationError, CommunicationError
 # Configure logging
 logger = logging.getLogger(__name__)
 
+
 class CommunicationAgent:
     """
     Agent responsible for generating human-readable explanations of veterinary cases.
-    
+
     Uses a text generation model to explain clinical terms and findings in simple language,
     making medical information more accessible to pet owners.
     """
@@ -56,9 +57,9 @@ class CommunicationAgent:
         try:
             # Sort cases by score in descending order
             sorted_cases = sorted(cases, key=lambda x: x.score, reverse=True)
-            finding_s = ''
+            finding_s = ""
             for i, case in enumerate(cases):
-                if 'text' not in case.payload:
+                if "text" not in case.payload:
                     logger.error(f"Invalid case format at index {i}")
                     continue
 
@@ -67,36 +68,31 @@ class CommunicationAgent:
                     And provide a short, clear explanation for each term.
                     example: Gastroenteritis: inflammation of the stomach and intestines causing vomiting and diarrhea.
                     Text: {clinical_text}"""
-                
+
                 try:
                     # Generate explanation for each case
-                    prompt = prompt_template.format(clinical_text=case.payload['text'])
+                    prompt = prompt_template.format(clinical_text=case.payload["text"])
                     inputs = self.tokenizer(
-                        prompt, 
-                        return_tensors="pt", 
-                        max_length=512, 
-                        truncation=True
+                        prompt, return_tensors="pt", max_length=512, truncation=True
                     )
                     inputs = {k: v.to(self.device) for k, v in inputs.items()}
-                    
+
                     outputs = self.model.generate(
                         **inputs,
                         max_new_tokens=50,
                         do_sample=True,
                         temperature=0.5,
-                        top_p=0.9
+                        top_p=0.9,
                     )
-                    
+
                     decoded_output = self.tokenizer.decode(
-                        outputs[0], 
-                        skip_special_tokens=True
+                        outputs[0], skip_special_tokens=True
                     )
-                    
+
                     finding_s += (
-                        f"{len(cases)-i}.{case.payload['text']}\n"
-                        f"{decoded_output}\n"
+                        f"{len(cases)-i}.{case.payload['text']}\n" f"{decoded_output}\n"
                     )
-                    
+
                 except Exception as e:
                     logger.error(f"Failed to process case {i}: {e}")
                     continue
@@ -107,13 +103,13 @@ class CommunicationAgent:
                 "to address these health findings and discuss the most effective "
                 "treatment options for your pet? (please provide yes or no)"
             )
-            
+
             # Combine all parts
             final_output = (
                 f"Here are my findings: (Symptoms, treatment, clinical explanation)"
                 f"\n\n{finding_s}{appointment_question}"
             )
-            
+
             return self._deduplicate_numbered_sections(final_output)
 
         except Exception as e:
@@ -137,18 +133,18 @@ class CommunicationAgent:
             raise ValueError("Input must be a string")
 
         try:
-            blocks = re.split(r'(?=\d+\.)', text)
+            blocks = re.split(r"(?=\d+\.)", text)
             seen = set()
             unique_blocks = []
-            
+
             for block in blocks:
                 cleaned_block = block.strip()
                 if cleaned_block and cleaned_block not in seen:
                     unique_blocks.append(cleaned_block)
                     seen.add(cleaned_block)
-                    
-            return '\n'.join(unique_blocks)
-            
+
+            return "\n".join(unique_blocks)
+
         except Exception as e:
             logger.error(f"Deduplication failed: {e}")
             return text  # Return original text if deduplication fails

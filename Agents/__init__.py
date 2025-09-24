@@ -8,14 +8,14 @@ from .exceptions import (
     SearchOperationError,
     DatabaseConnectionError,
     PredictionError,
-    CommunicationError
+    CommunicationError,
 )
 
 __all__ = [
-    'AgentError',
-    'AgentInitializationError',
-    'SearchOperationError',
-    'DatabaseConnectionError',
-    'PredictionError',
-    'CommunicationError'
+    "AgentError",
+    "AgentInitializationError",
+    "SearchOperationError",
+    "DatabaseConnectionError",
+    "PredictionError",
+    "CommunicationError",
 ]

@@ -7,10 +7,11 @@ from .exceptions import AgentError
 # Configure logging
 logger = logging.getLogger(__name__)
 
+
 class VetBERTMixin:
     """
     Mixin class that provides VetBERT embedding functionality.
-    
+
     This mixin adds methods for generating embeddings using the VetBERT model,
     which has been specifically trained on veterinary text data. It handles
     the conversion between PyTorch tensors and numpy arrays, with proper
@@ -18,9 +19,7 @@ class VetBERTMixin:
     """
 
     def get_vetbert_embeddings(
-        self, 
-        user_input: str, 
-        return_numpy: bool = True
+        self, user_input: str, return_numpy: bool = True
     ) -> Union[torch.Tensor, np.ndarray]:
         """
         Generate embeddings using VetBERT model.
@@ -45,14 +44,14 @@ class VetBERTMixin:
         try:
             # Ensure model is in eval mode
             self.model.eval()
-            
+
             # Tokenize input
             inputs = self.tokenizer(
                 user_input,
                 return_tensors="pt",
                 padding=True,
                 truncation=True,
-                max_length=512
+                max_length=512,
             )
 
             # Move inputs to correct device
@@ -79,7 +78,9 @@ class VetBERTMixin:
                     logger.error(f"Failed to convert embeddings to numpy: {e}")
                     raise AgentError("Numpy conversion failed")
 
-            logger.debug(f"Successfully generated embeddings of shape {embeddings.shape}")
+            logger.debug(
+                f"Successfully generated embeddings of shape {embeddings.shape}"
+            )
             return embeddings
 
         except Exception as e:
@@ -89,11 +90,11 @@ class VetBERTMixin:
     def _validate_model_device(self) -> None:
         """
         Validate that model and device are properly configured.
-        
+
         Raises:
             AgentError: If model or device configuration is invalid
         """
-        if not hasattr(self, 'model'):
+        if not hasattr(self, "model"):
             raise AgentError("Model not initialized")
-        if not hasattr(self, 'device'):
+        if not hasattr(self, "device"):
             raise AgentError("Device not initialized")
