@@ -139,7 +139,7 @@ async def startup_event():
 
         # Initialize agent instances using loaded models
         classification_agent = ClassificationAgent(classification_model, classification_tokenizer, device)
-        retrieval_agent = RetrievalAgent(vetbert_model, vetbert_tokenizer, device, client, collection_name, max_neg=4,  # Maximum hard negatives to select
+        retrieval_agent = RetrievalAgent(vetbert_model, vetbert_tokenizer, device, client, COLLECTION_NAME, max_neg=4,  # Maximum hard negatives to select
         percentage_margin=0.95)  # Threshold for negative selection
         communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
         
@@ -159,6 +159,7 @@ SIMILARITY_THRESHOLD = 0.8
 MAX_CASES = 3
 TOP_K_CANDIDATES = 10  # For hard-negative mining
 POSITIVE_PERCENTAGE = 0.3  # Keep top 30% as positives
+COLLECTION_NAME = "vet_notes"
 
 @app.post("/converse")
 async def converse(input_data: SymptomInput):
