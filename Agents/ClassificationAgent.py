@@ -87,9 +87,7 @@ class ClassificationAgent:
                 probs = F.softmax(logits, dim=-1)
                 confidence_score, pred_label = torch.max(probs, dim=1)
 
-            logger.info(
-                f"Successfully generated prediction with confidence {confidence_score.item():.4f}"
-            )
+            logger.info(f"Successfully generated prediction with confidence {confidence_score.item():.4f}")
             return pred_label.item(), confidence_score.item()
 
         except torch.cuda.OutOfMemoryError:
@@ -120,17 +118,13 @@ class ClassificationAgent:
             predicted_label, confidence = self.predict_condition(user_input)
 
             # Convert to condition name with fallback
-            condition_name = self.label_to_condition.get(
-                predicted_label, "unknown condition"
-            )
+            condition_name = self.label_to_condition.get(predicted_label, "unknown condition")
 
             # Validate confidence score
             if not 0 <= confidence <= 1:
                 logger.warning(f"Unusual confidence score: {confidence}")
 
-            logger.info(
-                f"Identified condition: {condition_name} with confidence: {confidence:.4f}"
-            )
+            logger.info(f"Identified condition: {condition_name} with confidence: {confidence:.4f}")
             return condition_name, confidence
 
         except Exception as e:

@@ -18,9 +18,7 @@ class VetBERTMixin:
     error handling for device management and model operations.
     """
 
-    def get_vetbert_embeddings(
-        self, user_input: str, return_numpy: bool = True
-    ) -> Union[torch.Tensor, np.ndarray]:
+    def get_vetbert_embeddings(self, user_input: str, return_numpy: bool = True) -> Union[torch.Tensor, np.ndarray]:
         """
         Generate embeddings using VetBERT model.
 
@@ -78,9 +76,7 @@ class VetBERTMixin:
                     logger.error(f"Failed to convert embeddings to numpy: {e}")
                     raise AgentError("Numpy conversion failed")
 
-            logger.debug(
-                f"Successfully generated embeddings of shape {embeddings.shape}"
-            )
+            logger.debug(f"Successfully generated embeddings of shape {embeddings.shape}")
             return embeddings
 
         except Exception as e:

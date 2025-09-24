@@ -144,9 +144,7 @@ async def startup_event():
 
         # Load classification model and tokenizer
         repo_id = "fdastak/model_calssification"
-        classification_model = AutoModelForSequenceClassification.from_pretrained(
-            repo_id
-        )
+        classification_model = AutoModelForSequenceClassification.from_pretrained(repo_id)
         classification_tokenizer = AutoTokenizer.from_pretrained(repo_id)
 
         # Load summarization model/tokenizer
@@ -155,9 +153,7 @@ async def startup_event():
         summarization_model = T5ForConditionalGeneration.from_pretrained(model_name)
 
         # Initialize agent instances using loaded models
-        classification_agent = ClassificationAgent(
-            classification_model, classification_tokenizer, device
-        )
+        classification_agent = ClassificationAgent(classification_model, classification_tokenizer, device)
         retrieval_agent = RetrievalAgent(
             vetbert_model,
             vetbert_tokenizer,
@@ -167,9 +163,7 @@ async def startup_event():
             max_neg=4,  # Maximum hard negatives to select
             percentage_margin=0.95,
         )  # Threshold for negative selection
-        communication_agent = CommunicationAgent(
-            summarization_model, summarization_tokenizer, device
-        )
+        communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
 
         logger.info("All models and clients initialized.")
     except Exception as e:
@@ -219,12 +213,8 @@ async def converse(input_data: SymptomInput):
 
         # Step 2: If confidence is high enough, proceed with retrieval and explanation
         try:
-            similar_cases = retrieval_agent.find_similar_cases(
-                user_input, condition_name, limit=3
-            )
-            filtered_cases = [
-                case for case in similar_cases if case.score >= SIMILARITY_THRESHOLD
-            ]
+            similar_cases = retrieval_agent.find_similar_cases(user_input, condition_name, limit=3)
+            filtered_cases = [case for case in similar_cases if case.score >= SIMILARITY_THRESHOLD]
             # If no cases meet similarity threshold
             if not filtered_cases:
                 return {
@@ -237,9 +227,7 @@ async def converse(input_data: SymptomInput):
                         "team for a proper examination. Would you like to schedule an appointment? (please reply with yes/no)"
                     ),
                 }
-            conversation_output = communication_agent.output_vet_assistant(
-                filtered_cases
-            )
+            conversation_output = communication_agent.output_vet_assistant(filtered_cases)
         except ValueError as ve:
             raise HTTPException(status_code=422, detail=str(ve))
         except Exception as e:
@@ -251,10 +239,7 @@ async def converse(input_data: SymptomInput):
 
         if filtered_cases:
             # Add similarity scores to the response
-            similar_cases_info = [
-                {"score": case.score, "text": case.payload["text"]}
-                for case in filtered_cases
-            ]
+            similar_cases_info = [{"score": case.score, "text": case.payload["text"]} for case in filtered_cases]
 
         # Step 3: Return complete response
         response = {
@@ -323,6 +308,4 @@ async def appointment_response(response: AppointmentResponse):
             }
     except Exception as e:
         logger.error(f"Error processing appointment response: {e}")
-        raise HTTPException(
-            status_code=500, detail="An error occurred while processing your response"
-        )
+        raise HTTPException(status_code=500, detail="An error occurred while processing your response")

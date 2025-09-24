@@ -17,9 +17,10 @@ client = TestClient(app)
 @pytest.fixture
 def mock_models():
     """Mock all ML models"""
-    with patch("AI_Agents.AutoModel.from_pretrained") as mock_model, patch(
-        "AI_Agents.AutoTokenizer.from_pretrained"
-    ) as mock_tokenizer:
+    with (
+        patch("AI_Agents.AutoModel.from_pretrained") as mock_model,
+        patch("AI_Agents.AutoTokenizer.from_pretrained") as mock_tokenizer,
+    ):
         mock_model.return_value = Mock()
         mock_tokenizer.return_value = Mock()
         yield mock_model, mock_tokenizer
@@ -37,20 +38,18 @@ class TestConversationEndpoint:
     """Test the /converse endpoint"""
 
     def test_high_confidence_response(self, mock_models, mock_qdrant):
-        with patch("AI_Agents.classification_agent") as mock_class, patch(
-            "AI_Agents.retrieval_agent"
-        ) as mock_ret, patch("AI_Agents.communication_agent") as mock_comm:
+        with (
+            patch("AI_Agents.classification_agent") as mock_class,
+            patch("AI_Agents.retrieval_agent") as mock_ret,
+            patch("AI_Agents.communication_agent") as mock_comm,
+        ):
 
             # Setup complete mock chain
             mock_class.identify_condition.return_value = ("ear infections", 0.95)
-            mock_ret.find_similar_cases.return_value = [
-                Mock(score=0.9, payload={"text": "test case"})
-            ]
+            mock_ret.find_similar_cases.return_value = [Mock(score=0.9, payload={"text": "test case"})]
             mock_comm.output_vet_assistant.return_value = "Test explanation"
 
-            response = client.post(
-                "/converse", json={"user_input": "My dog has an ear infection"}
-            )
+            response = client.post("/converse", json={"user_input": "My dog has an ear infection"})
 
             assert response.status_code == 200
             data = response.json()
@@ -85,9 +84,7 @@ class TestAppointmentEndpoint:
         ],
     )
     def test_appointment_responses(self, input_response, expected_status):
-        response = client.post(
-            "/appointment_response", json={"wants_appointment": input_response}
-        )
+        response = client.post("/appointment_response", json={"wants_appointment": input_response})
 
         assert response.status_code == expected_status
         if expected_status == 200:
@@ -98,9 +95,7 @@ class TestAppointmentEndpoint:
                 assert "message" in data
 
     def test_calendly_link(self):
-        response = client.post(
-            "/appointment_response", json={"wants_appointment": "yes"}
-        )
+        response = client.post("/appointment_response", json={"wants_appointment": "yes"})
 
         assert response.status_code == 200
         data = response.json()

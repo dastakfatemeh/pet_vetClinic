@@ -72,9 +72,7 @@ class CommunicationAgent:
                 try:
                     # Generate explanation for each case
                     prompt = prompt_template.format(clinical_text=case.payload["text"])
-                    inputs = self.tokenizer(
-                        prompt, return_tensors="pt", max_length=512, truncation=True
-                    )
+                    inputs = self.tokenizer(prompt, return_tensors="pt", max_length=512, truncation=True)
                     inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
                     outputs = self.model.generate(
@@ -85,13 +83,9 @@ class CommunicationAgent:
                         top_p=0.9,
                     )
 
-                    decoded_output = self.tokenizer.decode(
-                        outputs[0], skip_special_tokens=True
-                    )
+                    decoded_output = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-                    finding_s += (
-                        f"{len(cases)-i}.{case.payload['text']}\n" f"{decoded_output}\n"
-                    )
+                    finding_s += f"{len(cases)-i}.{case.payload['text']}\n" f"{decoded_output}\n"
 
                 except Exception as e:
                     logger.error(f"Failed to process case {i}: {e}")

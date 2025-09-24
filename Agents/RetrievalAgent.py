@@ -59,9 +59,7 @@ class RetrievalAgent(VetBERTMixin):
             logger.error(f"Failed to initialize RetrievalAgent: {e}")
             raise AgentInitializationError("Failed to initialize retrieval agent")
 
-    def _mine_hard_negatives(
-        self, query_vector: np.ndarray, cases: List[Record]
-    ) -> List[Record]:
+    def _mine_hard_negatives(self, query_vector: np.ndarray, cases: List[Record]) -> List[Record]:
         """
         Apply TopK-PercPos hard negative mining.
 
@@ -89,21 +87,17 @@ class RetrievalAgent(VetBERTMixin):
                 case
                 for case in cases
                 if case.score <= max_neg_score_threshold
-                and case.id
-                != positive_case.id  # Use ID comparison instead of object comparison
+                and case.id != positive_case.id  # Use ID comparison instead of object comparison
             ]
 
             # Sort negatives by similarity (descending) and take top-k
-            hard_negatives = sorted(
-                negative_candidates, key=lambda x: x.score, reverse=True
-            )[: self.max_neg]
+            hard_negatives = sorted(negative_candidates, key=lambda x: x.score, reverse=True)[: self.max_neg]
 
             # Combine positive with hard negatives
             final_cases = [positive_case] + hard_negatives
 
             logger.info(
-                f"Mining results - Positive score: {positive_score:.4f}, "
-                f"Hard negatives: {len(hard_negatives)}"
+                f"Mining results - Positive score: {positive_score:.4f}, " f"Hard negatives: {len(hard_negatives)}"
             )
             return final_cases
 
@@ -111,20 +105,14 @@ class RetrievalAgent(VetBERTMixin):
             logger.error(f"Error in hard negative mining: {e}")
             return cases
 
-    def find_similar_cases(
-        self, user_input: str, condition: str, limit: int = 3
-    ) -> List[Record]:
+    def find_similar_cases(self, user_input: str, condition: str, limit: int = 3) -> List[Record]:
         """Find similar cases using TopK-PercPos hard negative mining."""
         try:
             # Generate query embedding
             query_vector = self.get_vetbert_embeddings(user_input, return_numpy=True)
 
             # Set up condition filter
-            condition_filter = Filter(
-                must=[
-                    FieldCondition(key="condition", match=MatchValue(value=condition))
-                ]
-            )
+            condition_filter = Filter(must=[FieldCondition(key="condition", match=MatchValue(value=condition))])
 
             # Get initial results
             initial_results = self.client.search(
@@ -145,9 +133,7 @@ class RetrievalAgent(VetBERTMixin):
             # Return requested number of results
             final_results = mined_results[:limit]
 
-            logger.info(
-                f"Found {len(final_results)} cases after mining for condition: {condition}"
-            )
+            logger.info(f"Found {len(final_results)} cases after mining for condition: {condition}")
             return final_results
 
         except Exception as e:
