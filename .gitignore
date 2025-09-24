@@ -52,3 +52,6 @@ results/
 #Ignore http files
 *.http
 
+#Ignore README_myself
+README_myself.md
+*.README_myself.md

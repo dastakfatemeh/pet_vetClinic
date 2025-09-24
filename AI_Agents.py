@@ -12,16 +12,71 @@ import torch.nn.functional as F
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import  Filter, FieldCondition, MatchValue
 from enum import Enum
-from fastapi.responses import JSONResponse
 from Agents import ClassificationAgent, RetrievalAgent, CommunicationAgent
-
+# Add these imports at the top
+from contextlib import asynccontextmanager
+from typing import Optional
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI app declaration
-app = FastAPI()
+# Add lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    try:
+        # Initialize resources
+        await startup_event()
+        yield
+    finally:
+        # Cleanup
+        await shutdown()
+
+# Modify FastAPI initialization to use lifespan
+app = FastAPI(lifespan=lifespan)
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    # Simplify the error message
+    error_message = "Please provide a valid response: 'yes' or 'no'"
+    
+    # For debugging purposes, log the detailed error
+    logger.debug(f"Validation error details: {errors}")
+
+    return JSONResponse(
+        status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "status": "error",
+            "message": error_message,
+            "details": "Only 'yes', 'no', 'y', or 'n' are accepted responses"
+        }
+    )
+
+
+# Add shutdown handler
+@app.on_event("shutdown")
+async def shutdown():
+    """Cleanup resources on shutdown"""
+    global client, classification_agent, retrieval_agent, communication_agent
+    try:
+        # Clean up Qdrant client
+        if client:
+            await client.close()
+        
+        # Clear agent references
+        classification_agent = None
+        retrieval_agent = None
+        communication_agent = None
+        
+        logger.info("Successfully cleaned up resources")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
 
 # Globals for heavy resources (initialized in startup event)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -35,39 +90,56 @@ communication_agent = None
 # Define input schema for API
 class SymptomInput(BaseModel):
     user_input: str
+    
+    @validator('user_input')
+    def validate_input(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Input cannot be empty")
+        if len(v) > 1000:
+            raise HTTPException(
+                status_code=400,
+                detail="Input too long. Maximum 1000 characters allowed."
+            )
+        return v.strip()
 
 # Startup event to initialize clients and models once
 @app.on_event("startup")
 async def startup_event():
+    """Initialize resources on startup"""
     global client, classification_agent, retrieval_agent, communication_agent
 
-    # Initialize Qdrant client
-    client = QdrantClient(url="http://localhost:6333")
+    try:
+        # Initialize Qdrant client
+        client = QdrantClient(url="http://localhost:6333")
+        
     
-    # Load VetBERT model/tokenizer for embeddings
-    vetbert_model = AutoModel.from_pretrained("havocy28/VetBERT")
-    vetbert_tokenizer = AutoTokenizer.from_pretrained("havocy28/VetBERT")
-    
-    # Login Hugging Face
-    login(token=hf_token_read)
-    
-    # Load classification model and tokenizer
-    repo_id = "fdastak/model_calssification"
-    classification_model = AutoModelForSequenceClassification.from_pretrained(repo_id)
-    classification_tokenizer = AutoTokenizer.from_pretrained(repo_id)
-    
-    # Load summarization model/tokenizer
-    model_name = "google/flan-t5-base"
-    summarization_tokenizer = T5Tokenizer.from_pretrained(model_name)
-    summarization_model = T5ForConditionalGeneration.from_pretrained(model_name)
+        # Load VetBERT model/tokenizer for embeddings
+        vetbert_model = AutoModel.from_pretrained("havocy28/VetBERT")
+        vetbert_tokenizer = AutoTokenizer.from_pretrained("havocy28/VetBERT")
+        
+        # Login Hugging Face
+        login(token=hf_token_read)
+        
+        # Load classification model and tokenizer
+        repo_id = "fdastak/model_calssification"
+        classification_model = AutoModelForSequenceClassification.from_pretrained(repo_id)
+        classification_tokenizer = AutoTokenizer.from_pretrained(repo_id)
+        
+        # Load summarization model/tokenizer
+        model_name = "google/flan-t5-base"
+        summarization_tokenizer = T5Tokenizer.from_pretrained(model_name)
+        summarization_model = T5ForConditionalGeneration.from_pretrained(model_name)
 
-    # Initialize agent instances using loaded models
-    classification_agent = ClassificationAgent(classification_model, classification_tokenizer, device)
-    retrieval_agent = RetrievalAgent(vetbert_model, vetbert_tokenizer, device, client, collection_name, max_neg=4,  # Maximum hard negatives to select
-    percentage_margin=0.95)  # Threshold for negative selection
-    communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
-    
-    logger.info("All models and clients initialized.")
+        # Initialize agent instances using loaded models
+        classification_agent = ClassificationAgent(classification_model, classification_tokenizer, device)
+        retrieval_agent = RetrievalAgent(vetbert_model, vetbert_tokenizer, device, client, collection_name, max_neg=4,  # Maximum hard negatives to select
+        percentage_margin=0.95)  # Threshold for negative selection
+        communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
+        
+        logger.info("All models and clients initialized.")
+    except Exception as e:
+        logger.error(f"Failed to initialize resources: {e}")
+        raise RuntimeError("Application startup failed") from e
 
 # Define API endpoints
 @app.get("/ping")
@@ -126,12 +198,15 @@ async def converse(input_data: SymptomInput):
                     )
                 }
             conversation_output = communication_agent.output_vet_assistant(filtered_cases)
+        except ValueError as ve:
+            raise HTTPException(status_code=422, detail=str(ve))
         except Exception as e:
-            logger.error(f"Error in retrieval or communication: {str(e)}")
+            logger.exception(f"Error processing query: {str(e)}")
             raise HTTPException(
                 status_code=500,
-                detail="Failed to process veterinary information"
+                detail="An unexpected error occurred while processing your request"
             )
+        
         if filtered_cases:
            # Add similarity scores to the response
             similar_cases_info = [
@@ -159,27 +234,39 @@ async def converse(input_data: SymptomInput):
         )
 
 class AppointmentResponseEnum(str, Enum):
-    yes = "yes"
-    no = "no"
+    YES = "yes"
+    NO = "no"
+
+    @classmethod
+    def _missing_(cls, value):
+        # Normalize input for case and short forms
+        if isinstance(value, str):
+            val = value.strip().lower()
+            if val in ['y', 'yes']:
+                return cls.YES
+            elif val in ['n', 'no']:
+                return cls.NO
+        return None
 
 class AppointmentResponse(BaseModel):
     wants_appointment: AppointmentResponseEnum
 
-@validator('wants_appointment')
-def validate_response(cls, v):
-        # Convert to lowercase for case-insensitive comparison
-        response = v.lower().strip()
-        if response not in ['yes', 'no']:
-            raise ValueError(
-                "Invalid response. Please answer with 'yes' or 'no'."
-            )
-        return response
-
+    @validator('wants_appointment', pre=True)
+    def normalize_wants_appointment(cls, v):
+        # If short forms like 'Y', 'N' are passed, convert them here before enum validation
+        if isinstance(v, str):
+            v = v.strip().lower()
+            if v == 'y':
+                return 'yes'
+            elif v == 'n':
+                return 'no'
+        return v
+    
 @app.post("/appointment_response")
 async def appointment_response(response: AppointmentResponse):
+    "Handle appointment scheduling response"
     try:
-        if response.wants_appointment == AppointmentResponseEnum.yes:
-            # Logic to handle confirmed appointment
+        if response.wants_appointment == AppointmentResponseEnum.YES.value:
             calendar_link = "https://calendly.com/fhosseinzadh/30min"
             return JSONResponse(
                 content={
@@ -188,8 +275,9 @@ async def appointment_response(response: AppointmentResponse):
                 }
             )
         else:
-            # User declined appointment
-            return {"message": "Thanks for reaching out. If you have any more questions or need assistance in the future, feel free to contact us. Take care!"}
+            return {
+                "message": "Thanks for reaching out. If you have any more questions or need assistance in the future, feel free to contact us. Take care!"
+            }
     except Exception as e:
         logger.error(f"Error processing appointment response: {e}")
         raise HTTPException(

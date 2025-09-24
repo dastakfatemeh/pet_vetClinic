@@ -1,193 +1,123 @@
-# Pet Health Symptom Classification and Retrieval System
+# 🏥 Pet Health AI Assistant
 
-## Overview
-This project implements a comprehensive pet health analysis system with two main components:
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-latest-green)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen)
+![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-enabled-blue)
+![License](https://img.shields.io/badge/license-MIT-purple.svg)
+
+> AI-powered veterinary system for symptom analysis, case retrieval, and patient communication
+
+## 📚 Table of Contents
+- [Overview](#overview)
+- [Components](#components)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Features](#features)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+## 🎯 Overview
+This project implements a comprehensive pet health analysis system with three main components:
 1. A classification model using VetBERTDx transformer for symptom classification
 2. A vector database system for efficient symptom similarity search and retrieval
+3. A T5 LLM model to explain clinical terms in simple language
 
-## Components
+## 🔧 Components
 
 ### 1. Classification System
 - **Base Model**: VetBERTDx (havocy28/VetBERTDx)
 - **Type**: Fine-tuned BERT for sequence classification
-- **Training Data**: Pet health symptoms dataset with clinical notes and owner observations
-- **Hosted Model**: Available on Hugging Face Hub at [fdastak/model_calssification](https://huggingface.co/fdastak/model_calssification)
+- **Training Data**: Pet health symptoms dataset
+- **Hosted Model**: [fdastak/model_calssification](https://huggingface.co/fdastak/model_calssification)
 
-### 2. Vector Database System
-- **Embedding Model**: VetBERT for domain-specific text embeddings
-- **Vector Database**: Qdrant for efficient similarity search
+### 2. Vector Database System 🔍
+- **Embedding Model**: VetBERT
+- **Vector Database**: Qdrant
 - **Features**: 
-  - Text vectorization of clinical notes
+  - Text vectorization
   - Semantic similarity search
-  - Fast retrieval of similar cases
+  - Fast retrieval
   - Docker-based deployment
 
-## Project Structure
-```
-├── Raw_Data/
-│   └── pet-health-symptoms-dataset.csv   # Training dataset
-├── model/
-│   └── classification_ownernotes_clean/  # Local model files
-├── Clean_Classification.ipynb            # Classification notebook
-├── Vector_DB.ipynb                      # Vector database implementation
-├── data_Clinic.pkl                      # Processed clinical data with embeddings
-├── HF_t.py                              # Hugging Face tokens
-└── README.md
-```
+### 3. Communication System 💬
+- **Base Model**: T5 for NLG
+- **Features**: 
+  - Clinical term explanations
+  - Appointment scheduling
+  - TopK-PercPos Hard Negative Mining
+  - Similarity thresholds (0.8)
 
-## Features
-- Data preprocessing and cleaning with lowercase normalization
-- Model fine-tuning using VetBERTDx transformer
-- Separate processing for clinical notes and owner observations
-- Model evaluation with detailed metrics:
-  - Accuracy
-  - Precision
-  - Recall
-  - F1 Score
-- Confusion matrix visualization
-- Hugging Face Hub integration for model hosting
+## 🚀 Installation
 
-## Requirements
-- Python 3.11
-- PyTorch
-- Transformers
-- Pandas
-- Scikit-learn
-- Matplotlib
-- sentence-transformers
-- huggingface-hub
-- hf_xet
-- qdrant-clients
-- sentencepiece
-- ipykernel
-- torch torchvision torchaudio
-- fastapi
-- python -m pip install "uvicorn[standard]"
-
-
-## Model Performance
-The model is evaluated on a validation set with metrics including:
-- Confusion matrix visualization
-- Classification report with per-class metrics
-- Overall accuracy and F1 score
-
-## Installation
-
-### 1. Clone the Repository
+### Prerequisites
 ```bash
+# Clone repository
 git clone https://github.com/dastakfatemeh/pet_vetClinic.git
 cd pet_vetClinic
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### 2. Install Python Dependencies
+### Qdrant Setup
 ```bash
-pip install torch transformers pandas scikit-learn matplotlib huggingface qdrant-client
+# Pull Qdrant image
+docker pull qdrant/qdrant
+
+# Run container
+docker run -p 6333:6333 -d --name qdrant qdrant/qdrant
 ```
 
-### 3. Set Up Qdrant Vector Database
-Qdrant is used as the vector database for storing and searching embeddings. Follow these steps to set it up using Docker:
+## 💻 Usage
 
-1. **Install Docker** (if not already installed):
-   - Download and install Docker from [https://www.docker.com/get-started](https://www.docker.com/get-started)
-
-2. **Pull the Qdrant Image**:
-   ```bash
-   docker pull qdrant/qdrant
-   ```
-
-3. **Create Storage Directory**:
-   ```bash
-   # Windows
-   mkdir C:/opt/databases/qdrant/storage
-
-   # Linux/Mac
-   mkdir -p /opt/databases/qdrant/storage
-   ```
-
-4. **Run Qdrant Container**:
-   ```bash
-   # Windows
-   docker run --publish 6333:6333 -d --name qdrant --volume C:/opt/databases/qdrant/storage:/qdrant/storage qdrant/qdrant
-
-   # Linux/Mac
-   docker run --publish 6333:6333 -d --name qdrant --volume /opt/databases/qdrant/storage:/qdrant/storage qdrant/qdrant
-   ```
-
-5. **Verify Installation**:
-   - Access the Qdrant dashboard at [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
-   - You should see the web interface where you can monitor your collections
-
-## Usage
-
-### 1. Model Fine-tuning (Optional)
-If you want to fine-tune the model on your own data, use `Clean_Classification.ipynb`:
-- Load and preprocess the pet health symptoms dataset
-- Fine-tune the VetBERTDx model on your data
-- Evaluate model performance with metrics
-- Visualize results with confusion matrix
-- Save and upload model to Hugging Face Hub
-
-### 2. Vector Database Setup and Search
-To vectorize veterinary clinical notes and set up similarity search, use `Vector_DB.ipynb`:
-- Initialize VetBERT model for embeddings
-- Process and vectorize clinical notes
-- Set up Qdrant vector database
-- Store embeddings in the database
-- Perform semantic similarity searches
-- Retrieve similar clinical cases
-
-Note: Ensure Qdrant is running (see Installation section) before working with `Vector_DB.ipynb`.
-
-### 3. Running the Application
-To start the FastAPI application, run the following command in your terminal:
-
-```bash (python environemt)
+```bash
+# Start FastAPI application
 python -m uvicorn AI_Agents:app --reload
+
+# Access API docs
+# Open http://127.0.0.1:8000/docs
 ```
 
-Once you see the "Application startup complete" message, you can interact with the API in two ways:
+## ⭐ Features
+- ML-powered symptom classification
+- Semantic similarity search
+- TopK-PercPos hard negative mining
+- Custom error handling
+- Input validation
+- Logging system
+- Docker support
+- CI/CD pipeline
 
-1. **Using the Interactive API Documentation**:
-   - Open your browser and go to [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-   - Use the interactive interface to input your pet's symptoms and get predictions
+## 🧪 Testing
+```bash
+# Run all tests
+pytest tests/ -v
 
-2. **Using Command Line (curl)**:
-   ```bash
-   curl -X POST http://127.0.0.1:8000/converse -H "Content-Type: application/json" -d "{\"user_input\": \"My dog has been scratching a lot lately.\"}"
-   ```
+# Run with coverage
+pytest --cov=. tests/
+```
 
-The application will return the predicted condition and similar cases from the database.
+## 🔄 CI/CD Pipeline
+- GitHub Actions automation
+- Multi-Python version testing
+- Code quality (flake8)
+- Formatting (black)
+- Test coverage reporting
 
-## Troubleshooting
+## 🛠️ Development Tools
+- **Testing**: GitHub Copilot assisted
+- **Error Handling**: Custom implementations
+- **Code Quality**: Automated checks
+- **Documentation**: Standard compliance
 
-### Qdrant Setup Issues
-1. **Port Already in Use**:
-   ```bash
-   # Stop existing container
-   docker stop qdrant
-   docker rm qdrant
-   # Then try running the container again
-   ```
+## ❗ Troubleshooting
+Common issues and solutions in the [Wiki](../../wiki)
 
-2. **Storage Permission Issues**:
-   - Ensure the storage directory has proper read/write permissions
-   - For Windows, run Docker Desktop with administrator privileges
-   - For Linux/Mac, check folder permissions: `chmod 777 /opt/databases/qdrant/storage`
+## 📄 License
+MIT © [dastakfatemeh](https://github.com/dastakfatemeh)
 
-3. **Container Not Starting**:
-   ```bash
-   # Check container logs
-   docker logs qdrant
-   ```
+---
 
-4. **Connection Issues**:
-   - Verify Qdrant is running: `docker ps | grep qdrant`
-   - Check if port 6333 is accessible: `curl http://localhost:6333/dashboard`
-
-For more detailed information, visit the [Qdrant Documentation](https://qdrant.tech/documentation/).
-
-## License
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contact
-Owner: dastakfatemeh
+<p align="center">Built with ❤️ and GitHub Copilot</p>
