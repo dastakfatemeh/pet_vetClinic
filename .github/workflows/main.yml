@@ -28,7 +28,11 @@ jobs:
         pip install -r requirements.txt
         pip install black flake8 pytest pytest-asyncio
     
-    - name: Check code formatting
+    - name: Format code
+      run: |
+        black .
+    
+    - name: Check formatting
       run: |
         black . --check
     
