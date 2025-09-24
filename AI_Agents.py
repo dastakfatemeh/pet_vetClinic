@@ -1,7 +1,7 @@
 import logging
 import re
 import torch
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request,HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
@@ -146,7 +146,7 @@ async def startup_event():
         login(token=hf_token_read)
 
         # Load classification model and tokenizer
-        repo_id = "fdastak/model_calssification"
+        repo_id = "fdastak/model_classification"
         classification_model = AutoModelForSequenceClassification.from_pretrained(repo_id)
         classification_tokenizer = AutoTokenizer.from_pretrained(repo_id)
 

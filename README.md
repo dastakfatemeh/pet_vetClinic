@@ -7,7 +7,7 @@
 ![GitHub Copilot](https://img.shields.io/badge/GitHub%20Copilot-enabled-blue)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
 
-<p align="center">Built with ❤️ and GitHub Copilot</p>
+
 
 > AI-powered veterinary system for symptom analysis, case retrieval, and patient communication
 
@@ -33,7 +33,7 @@ This project implements a comprehensive pet health analysis system with three ma
 - **Base Model**: VetBERTDx (havocy28/VetBERTDx)
 - **Type**: Fine-tuned BERT for sequence classification
 - **Training Data**: Pet health symptoms dataset
-- **Hosted Model**: [fdastak/model_calssification](https://huggingface.co/fdastak/model_calssification)
+- **Hosted Model**: [fdastak/model_classification](https://huggingface.co/fdastak/model_classification)
 
 ### 2. Vector Database System 🔍
 - **Embedding Model**: VetBERT
@@ -167,12 +167,8 @@ pytest --cov=. tests/
 - **Code Quality**: Automated checks
 - **Documentation**: Standard compliance
 
-## ❗ Troubleshooting
-Common issues and solutions in the [Wiki](../../wiki)
 
 ## 📄 License
 MIT © [dastakfatemeh](https://github.com/dastakfatemeh)
 
 ---
-
-<p align="center">Built with ❤️ and GitHub Copilot</p>
