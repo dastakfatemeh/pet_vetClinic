@@ -81,7 +81,7 @@ async def shutdown():
 # Globals for heavy resources (initialized in startup event)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-client = None
+client: Optional[QdrantClient] = None
 collection_name = "vet_notes"
 classification_agent = None
 retrieval_agent = None
@@ -112,6 +112,13 @@ async def startup_event():
         # Initialize Qdrant client
         client = QdrantClient(url="http://localhost:6333")
         
+        # Verify client connection
+        try:
+            await client.get_collections()
+            logger.info("Successfully connected to Qdrant")
+        except Exception as e:
+            logger.error(f"Failed to connect to Qdrant: {e}")
+            raise 
     
         # Load VetBERT model/tokenizer for embeddings
         vetbert_model = AutoModel.from_pretrained("havocy28/VetBERT")
