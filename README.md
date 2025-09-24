@@ -93,6 +93,58 @@ python -m uvicorn AI_Agents:app --reload
 - Docker support
 - CI/CD pipeline
 
+## 🔬 Model Performance
+
+### Current Capabilities
+- ✅ Effectively identifies common pet health conditions
+- ✅ Strong performance on clear infection indicators
+- ✅ Handles standard symptom descriptions
+- ❌ Limited accuracy with ambiguous symptoms
+- ❌ May struggle with complex or nuanced cases
+
+### Model Limitations & Improvements
+
+The model's performance is fundamentally tied to its training data quality and quantity. Key factors include:
+
+#### Data Foundation
+- Training data sourced from [Pet Health Symptoms Dataset](https://www.kaggle.com/datasets/yyzz1010/pet-health-symptoms-dataset) on Kaggle
+- Focuses on common pet health conditions and symptoms
+- Limited to specific use cases and scenarios
+
+#### Areas for Improvement
+1. **Data Quality & Quantity**
+   - Expand training data diversity
+   - Improve labeling accuracy
+   - Include more clinical scenarios
+
+2. **Clinical Coverage**
+   - Add breed-specific variations
+   - Expand range of conditions
+   - Include more complex cases
+
+3. **Validation & Testing**
+   - Enhanced expert validation
+   - Rigorous clinical testing
+   - Regular performance audits
+
+#### Limitations
+1. **Species Coverage**
+   - Currently focused on common pet conditions
+   - Limited cross-species applicability
+   - Breed-specific variations may be underrepresented
+
+2. **Clinical Accuracy**
+   - Not suitable for actual medical diagnosis
+   - Should not replace veterinary consultation
+   - Educational and informational purposes only
+
+## ⚠️ Important Disclaimer
+
+**This AI system is for educational and demonstration purposes only.**
+- Do not use for real diagnostic purposes
+- Always consult a qualified veterinarian for pet health concerns
+- This is not a substitute for professional veterinary care
+
 ## 🧪 Testing
 ```bash
 # Run all tests

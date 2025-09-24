@@ -1,7 +1,10 @@
 import logging
 import re
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 from pydantic import BaseModel, validator
 from huggingface_hub import login
 from HF_t import hf_token_read
@@ -78,7 +81,7 @@ async def shutdown():
     try:
         # Clean up Qdrant client
         if client:
-            await client.close()
+            client.close()
 
         # Clear agent references
         client = None
@@ -129,8 +132,8 @@ async def startup_event():
 
         # Verify client connection
         try:
-            await client.get_collections()
-            logger.info("Successfully connected to Qdrant")
+            collections = client.get_collections()
+            logger.info(f"Successfully connected to Qdrant. Collections: {collections}")
         except Exception as e:
             logger.error(f"Failed to connect to Qdrant: {e}")
             raise
@@ -160,8 +163,8 @@ async def startup_event():
             device,
             client,
             COLLECTION_NAME,
-            max_neg=4,  # Maximum hard negatives to select
-            percentage_margin=0.95,
+            max_neg=10,  # Maximum hard negatives to select
+            percentage_margin=0.75,
         )  # Threshold for negative selection
         communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
 
