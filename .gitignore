@@ -19,6 +19,7 @@ venv/
 # Ignore model binary files
 *.safetensors
 *.bin
+!requirements.txt 
 *.txt
 *.pth
 *.pt
