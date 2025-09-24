@@ -81,11 +81,11 @@ async def shutdown():
 # Globals for heavy resources (initialized in startup event)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Initialize globals with proper typing
 client: Optional[QdrantClient] = None
-collection_name = "vet_notes"
-classification_agent = None
-retrieval_agent = None
-communication_agent = None
+classification_agent: Optional[ClassificationAgent] = None
+retrieval_agent: Optional[RetrievalAgent] = None
+communication_agent: Optional[CommunicationAgent] = None
 
 # Define input schema for API
 class SymptomInput(BaseModel):
