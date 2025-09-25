@@ -24,3 +24,6 @@ flake8>=6.0.0
 # Utils
 python-multipart>=0.0.5
 typing-extensions>=4.0.0
+
+# Install python-dotenv
+pip install python-dotenv

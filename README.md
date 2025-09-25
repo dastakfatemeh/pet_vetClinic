@@ -55,14 +55,34 @@ This project implements a comprehensive pet health analysis system with three ma
 ## 🚀 Installation
 
 ### Prerequisites
+- Python 3.11+
+- Docker (for Qdrant)
+- HuggingFace account and token
+
 ```bash
 # Clone repository
 git clone https://github.com/dastakfatemeh/pet_vetClinic.git
 cd pet_vetClinic
 
+# Create virtual environment
+python -m venv venv
+.\venv\Scripts\activate
+
 # Install dependencies
 pip install -r requirements.txt
+pip install python-dotenv
 ```
+
+### Environment Configuration
+Create a `.env` file in project root:
+```plaintext
+HUGGING_FACE_TOKEN=your_huggingface_token_here
+```
+
+**Security Notes:**
+- Never commit `.env` file to repository
+- Keep HuggingFace token secure
+- Add `.env` to `.gitignore`
 
 ### Qdrant Setup
 ```bash

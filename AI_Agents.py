@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 from pydantic import BaseModel, validator
 from huggingface_hub import login
-from HF_t import hf_token_read
+#from HF_t import hf_token_read
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 from transformers import (
     AutoTokenizer,
@@ -31,6 +31,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
+import os
+from dotenv import load_dotenv
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -143,7 +146,16 @@ async def startup_event():
         vetbert_tokenizer = AutoTokenizer.from_pretrained("havocy28/VetBERT")
 
         # Login Hugging Face
-        login(token=hf_token_read)
+        # Load environment variables before accessing them
+        load_dotenv()
+
+        # Get token from environment
+        HF_TOKEN = os.getenv('HUGGING_FACE_TOKEN')
+        if not HF_TOKEN:
+            raise EnvironmentError("HUGGING_FACE_TOKEN environment variable is not set")
+
+        # Use the token for login
+        login(token=HF_TOKEN)
 
         # Load classification model and tokenizer
         repo_id = "fdastak/model_classification"
