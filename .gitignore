@@ -1,0 +1,41 @@
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+ENV/
+
+# Model files and sensitive data
+HF_t.py
+model/
+model_*/
+model_calssification/
+mlruns/
+
+# Binary files
+*.safetensors
+*.bin
+*.pth
+*.pt
+*.ckpt
+*.model
+
+# Text files except requirements.txt
+*.txt
+!requirements.txt
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Other
+*.http
+README_myself.md
