@@ -26,4 +26,4 @@ python-multipart>=0.0.5
 typing-extensions>=4.0.0
 
 # Install python-dotenv
-pip install python-dotenv
+python-dotenv>=1.0.0
