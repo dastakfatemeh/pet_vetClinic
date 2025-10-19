@@ -39,3 +39,7 @@ htmlcov/
 # Other
 *.http
 README_myself.md
+AI_Agnets.ipynb
+
+#Graphs
+*.md
