@@ -31,7 +31,7 @@ This project implements a comprehensive pet health analysis system with three ma
 
 ### System Architecture
 
-![Pet Health AI System Architecture] (Assets/simple_diagram.png)
+![Pet Health AI System Architecture](./Assets/Simple_diagram.png)
 
 For a more detailed view of the architecture, please see our complete_diagram file in Assets folder.
 
