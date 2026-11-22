@@ -2,9 +2,14 @@
 __pycache__/
 *.py[cod]
 *$py.class
-.env
 venv/
 ENV/
+
+# Secrets: API keys and tokens (HUGGING_FACE_TOKEN, TYPESAFE_API_KEY, CLOUDFLARE_API_TOKEN, ...)
+.env
+.env.*
+*.env
+!.env.example
 
 # Model files and sensitive data
 HF_t.py
@@ -24,6 +29,7 @@ mlruns/
 # Text files except requirements.txt
 *.txt
 !requirements.txt
+!experiments/*/requirements.txt
 
 # IDE specific
 .vscode/
@@ -43,3 +49,10 @@ AI_Agnets.ipynb
 
 #Graphs
 *.md
+# ...but keep the experiment write-ups (otherwise new docs there would be silently ignored)
+!experiments/**/*.md
+
+# Jev experiment outputs
+experiments/jev/results/
+experiments/decider/results/
+experiments/decider/inputs/

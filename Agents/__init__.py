@@ -9,6 +9,7 @@ from .exceptions import (
     DatabaseConnectionError,
     PredictionError,
     CommunicationError,
+    TriageError,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "DatabaseConnectionError",
     "PredictionError",
     "CommunicationError",
+    "TriageError",
 ]

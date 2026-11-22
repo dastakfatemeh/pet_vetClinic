@@ -1,0 +1,46 @@
+text,expected,emergency,category
+"My dog's belly is suddenly swollen and hard, he keeps trying to throw up but nothing comes out, and he can't settle.",digestive issues,1,emergency
+"Cat has been straining in the litter box for hours and nothing is coming out, crying when he tries.",none,1,emergency
+"My dog ate a whole bar of dark chocolate about an hour ago.",none,1,emergency
+"Puppy got into the antifreeze in the garage, now stumbling around like he's drunk.",none,1,emergency
+"My dog was hit by a car, he's walking but limping badly and breathing fast.",mobility problems,1,emergency
+"My cat is breathing with her mouth open and her gums look bluish.",none,1,emergency
+"Dog had a seizure that lasted about five minutes and isn't fully responsive yet.",none,1,emergency
+"My puppy has had bloody diarrhea all day and now won't drink and is very floppy.",digestive issues,1,emergency
+"Suddenly my dog's back legs stopped working, he's dragging them and cries when I touch his back.",mobility problems,1,emergency
+"My cat ate part of a lily from a bouquet and is drooling.",none,1,emergency
+"Dog was stung multiple times and now his face is swelling up and he's wheezing.",skin irritations,1,emergency
+"My rabbit hasn't eaten or pooped in over 24 hours and is hunched in the corner.",digestive issues,1,emergency
+"My cat sneezes a lot and has a runny nose and goopy eyes.",none,0,out_of_scope
+"My dog has been drinking much more water than usual and peeing all the time.",none,0,out_of_scope
+"Cat has bad breath and seems to chew on one side of her mouth.",none,0,out_of_scope
+"There's a cloudy film over one of my dog's eyes.",none,0,out_of_scope
+"My dog coughs like he's honking, especially after he pulls on the leash.",none,0,out_of_scope
+"What are your opening hours on Saturday?",none,0,out_of_scope
+"How much does a vaccination appointment cost?",none,0,out_of_scope
+"Is it safe to give my dog a bit of plain cooked chicken?",none,0,out_of_scope
+"My cat has been peeing outside the litter box lately.",none,0,out_of_scope
+"My hamster's teeth look really long and he struggles to eat.",none,0,out_of_scope
+"My dog has fleas and now has scabby, red, itchy patches all along his lower back.",parasites|skin irritations,0,multi_condition
+"Found worms in my puppy's poop and she's had diarrhea for three days.",parasites|digestive issues,0,multi_condition
+"Cat has ear mites and has scratched the skin behind her ears raw.",ear infections|parasites|skin irritations,0,multi_condition
+"Old dog is stiff getting up in the morning and also has an itchy rash on his belly.",mobility problems|skin irritations,0,multi_condition
+"My dog keeps shaking his head and his ear smells yeasty, and he also has itchy paws.",ear infections|skin irritations,0,multi_condition
+"pup keeps doin the butt scoot on the carpet lol",parasites|digestive issues,0,slang_typo
+"my cats ears r super gross n stinky, brown gunk everywhere",ear infections,0,slang_typo
+"doggo is walkin funny n wont jump on the couch no more",mobility problems,0,slang_typo
+"kitty threw up like 3x 2day n wont eat her food",digestive issues,0,slang_typo
+"he's got these lil black specks in his fur n wont stop scratchin",parasites,0,slang_typo
+"bald spots on my bunny n the skin looks all flaky",skin irritations,0,slang_typo
+"My dog is limping but there's no swelling and he still eats and plays normally.",mobility problems,0,negation_mixed
+"No vomiting or diarrhea, but my cat has been gassy and her tummy gurgles a lot.",digestive issues,0,negation_mixed
+"Her ears look clean and don't smell, but she has a bald, red patch on her leg.",skin irritations,0,negation_mixed
+"Vet ruled out fleas, yet my dog still has itchy red bumps on his belly.",skin irritations,0,negation_mixed
+"He isn't scratching at all, but I noticed tiny white rice-like bits near his tail.",parasites,0,negation_mixed
+"Not limping, but my senior cat no longer jumps onto the windowsill she loved.",mobility problems,0,negation_mixed
+"Mi perro se rasca mucho las orejas y sacude la cabeza.",ear infections,0,non_english
+"Mon chat vomit tous les matins depuis une semaine.",digestive issues,0,non_english
+"Since we switched to the new kibble, he's had loose stools and a lot of gas.",digestive issues,0,long_context
+"We hiked through tall grass last weekend and today I pulled a small grey bug off his neck.",parasites,0,long_context
+"She's 14 and has always been active, but over the past month she's been slower on walks and hesitates on stairs.",mobility problems,0,long_context
+"After swimming in the lake every day this summer, my lab keeps pawing at his right ear and tilting his head.",ear infections,0,long_context

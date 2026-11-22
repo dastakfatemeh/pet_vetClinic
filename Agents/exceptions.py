@@ -32,3 +32,9 @@ class CommunicationError(AgentError):
     """Raised when text generation or explanation fails."""
 
     pass
+
+
+class TriageError(AgentError):
+    """Raised when the emergency / scope assessment fails."""
+
+    pass
