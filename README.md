@@ -70,6 +70,12 @@ Classification Agent          ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌�
 
 ## 🔧 Components
 
+### System Architecture
+
+![Pet Health AI System Architecture](./Assets/Simple_diagram.png)
+
+For a more detailed view of the architecture, please see our complete_diagram file in Assets folder.
+
 ### 1. Classification System
 - **Base Model**: VetBERTDx (havocy28/VetBERTDx)
 - **Type**: Fine-tuned BERT for sequence classification
