@@ -1,13 +1,15 @@
+import asyncio
 import logging
 import re
 import torch
-from fastapi import FastAPI, Request,HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.status import HTTP_422_UNPROCESSABLE_ENTITY
 from pydantic import BaseModel, validator
 from huggingface_hub import login
-#from HF_t import hf_token_read
+
+# from HF_t import hf_token_read
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 from transformers import (
     AutoTokenizer,
@@ -23,6 +25,9 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 from enum import Enum
 from Agents import ClassificationAgent, RetrievalAgent, CommunicationAgent
+
+from Agents.TriageAgent import TriageAgent, TriageResult
+from Agents.triage_config import TriageSettings, build_triage_agent, load_triage_settings
 
 # Add these imports at the top
 from contextlib import asynccontextmanager
@@ -80,17 +85,22 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.on_event("shutdown")
 async def shutdown():
     """Cleanup resources on shutdown"""
-    global client, classification_agent, retrieval_agent, communication_agent
+    global client, classification_agent, retrieval_agent, communication_agent, triage_agent
     try:
         # Clean up Qdrant client
         if client:
             client.close()
+
+        # Clean up the triage model's HTTP client
+        if triage_agent:
+            await triage_agent.close()
 
         # Clear agent references
         client = None
         classification_agent = None
         retrieval_agent = None
         communication_agent = None
+        triage_agent = None
 
         logger.info("Successfully cleaned up resources")
     except Exception as e:
@@ -105,6 +115,7 @@ client: Optional[QdrantClient] = None
 classification_agent: Optional[ClassificationAgent] = None
 retrieval_agent: Optional[RetrievalAgent] = None
 communication_agent: Optional[CommunicationAgent] = None
+triage_agent: Optional[TriageAgent] = None
 
 
 # Define input schema for API
@@ -127,7 +138,7 @@ class SymptomInput(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     """Initialize resources on startup"""
-    global client, classification_agent, retrieval_agent, communication_agent
+    global client, classification_agent, retrieval_agent, communication_agent, triage_agent
 
     try:
         # Initialize Qdrant client
@@ -150,7 +161,7 @@ async def startup_event():
         load_dotenv()
 
         # Get token from environment
-        HF_TOKEN = os.getenv('HUGGING_FACE_TOKEN')
+        HF_TOKEN = os.getenv("HUGGING_FACE_TOKEN")
         if not HF_TOKEN:
             raise EnvironmentError("HUGGING_FACE_TOKEN environment variable is not set")
 
@@ -180,6 +191,22 @@ async def startup_event():
         )  # Threshold for negative selection
         communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
 
+        # Triage (emergency + out-of-scope checks) is optional; the pipeline runs without it.
+        # TRIAGE_MODEL picks the decision model (jev, clef, clef-flash or none); see Agents/triage_config.py
+        try:
+            settings: Optional[TriageSettings] = load_triage_settings()
+            if settings is None:
+                logger.warning("TRIAGE_MODEL=none; emergency and out-of-scope checks disabled")
+            else:
+                triage_agent = build_triage_agent(settings)
+                logger.info(
+                    f"Triage enabled: model={settings.model}, provider={settings.provider}, "
+                    f"emergency>={settings.emergency_threshold}, disagreement>={settings.disagreement_threshold}"
+                )
+        except Exception as e:
+            triage_agent = None
+            logger.error(f"Failed to initialize triage; emergency and out-of-scope checks disabled: {e}")
+
         logger.info("All models and clients initialized.")
     except Exception as e:
         logger.error(f"Failed to initialize resources: {e}")
@@ -199,6 +226,64 @@ MAX_CASES = 3
 TOP_K_CANDIDATES = 10  # For hard-negative mining
 POSITIVE_PERCENTAGE = 0.3  # Keep top 30% as positives
 COLLECTION_NAME = "vet_notes"
+# Fallback triage thresholds (Jev's). The configured model's own thresholds are used when triage is set up.
+EMERGENCY_THRESHOLD = 0.5  # Emergency probability above which we send the owner to urgent care
+TRIAGE_DISAGREEMENT_THRESHOLD = 0.8  # Triage confidence needed to overrule the classifier's condition
+
+EMERGENCY_MESSAGE = (
+    "Based on what you've described, your pet may need urgent veterinary care. Please contact your nearest "
+    "emergency veterinary clinic or call us right away. Do not wait for a scheduled appointment."
+)
+UNCERTAIN_MESSAGE = (
+    "I apologize, but I need more information to properly assess your pet's condition. "
+    "To ensure your pet receives the best care, I recommend scheduling an appointment "
+    "with our veterinary team for a thorough examination. Would you like to schedule "
+    "an appointment? (please reply with yes/no)"
+)
+
+
+def _triage_thresholds() -> tuple:
+    """(emergency, disagreement) thresholds of the configured triage model, or the Jev defaults."""
+    if isinstance(triage_agent, TriageAgent):
+        return triage_agent.emergency_threshold, triage_agent.disagreement_threshold
+    return EMERGENCY_THRESHOLD, TRIAGE_DISAGREEMENT_THRESHOLD
+
+
+async def _run_triage(user_input: str) -> Optional[TriageResult]:
+    """Run the triage checks; failures are logged and the pipeline continues without them."""
+    if triage_agent is None:
+        return None
+    try:
+        return await triage_agent.assess(user_input)
+    except Exception as e:
+        logger.warning(f"Triage unavailable, continuing without emergency/scope checks: {e}")
+        return None
+
+
+def _triage_summary(triage: Optional[TriageResult]) -> Optional[dict]:
+    if triage is None:
+        return None
+    return {
+        "model": triage_agent.name if isinstance(triage_agent, TriageAgent) else None,
+        "emergency_probability": triage.emergency_probability,
+        "condition": triage.condition,
+        "condition_confidence": triage.condition_confidence,
+    }
+
+
+def _escalation_reason(triage: Optional[TriageResult], condition_name: str, confidence: float) -> Optional[str]:
+    """Return why the classifier's answer should not be used, or None if it can be."""
+    if triage is not None:
+        emergency_threshold, disagreement_threshold = _triage_thresholds()
+        if triage.emergency_probability >= emergency_threshold:
+            return "emergency"
+        if not triage.in_scope:
+            return "out_of_scope"
+        if triage.condition != condition_name and triage.condition_confidence >= disagreement_threshold:
+            return "model_disagreement"
+    if confidence < CONFIDENCE_THRESHOLD:
+        return "low_confidence"
+    return None
 
 
 @app.post("/converse")
@@ -209,21 +294,22 @@ async def converse(input_data: SymptomInput):
     user_input = input_data.user_input
 
     try:
-        # Step 1: Classify condition with confidence check
-        condition_name, confidence = classification_agent.identify_condition(user_input)
+        # Step 1: Classify condition while triage (emergency + scope checks) runs concurrently
+        triage, (condition_name, confidence) = await asyncio.gather(
+            _run_triage(user_input),
+            asyncio.to_thread(classification_agent.identify_condition, user_input),
+        )
 
-        # Check confidence threshold
-        if confidence < CONFIDENCE_THRESHOLD:
+        # Emergencies, out-of-scope messages, model disagreement and low confidence skip retrieval
+        escalation_reason = _escalation_reason(triage, condition_name, confidence)
+        if escalation_reason:
             return {
-                "condition_identified": "uncertain",
+                "condition_identified": "emergency" if escalation_reason == "emergency" else "uncertain",
                 "confidence_score": confidence,
                 "similar_cases_count": 0,
-                "conversation": (
-                    "I apologize, but I need more information to properly assess your pet's condition. "
-                    "To ensure your pet receives the best care, I recommend scheduling an appointment "
-                    "with our veterinary team for a thorough examination. Would you like to schedule "
-                    "an appointment? (please reply with yes/no)"
-                ),
+                "escalation_reason": escalation_reason,
+                "triage": _triage_summary(triage),
+                "conversation": EMERGENCY_MESSAGE if escalation_reason == "emergency" else UNCERTAIN_MESSAGE,
             }
 
         # Step 2: If confidence is high enough, proceed with retrieval and explanation
@@ -236,6 +322,7 @@ async def converse(input_data: SymptomInput):
                     "condition_identified": condition_name,
                     "confidence_score": confidence,
                     "similar_cases_count": 0,
+                    "triage": _triage_summary(triage),
                     "conversation": (
                         "While I've identified the potential condition, I don't have sufficiently similar cases "
                         "to provide specific guidance. I recommend scheduling an appointment with our veterinary "
@@ -262,6 +349,7 @@ async def converse(input_data: SymptomInput):
             "confidence_score": confidence,
             "similar_cases_count": len(similar_cases),
             "similar_cases": similar_cases_info,
+            "triage": _triage_summary(triage),
             "conversation": conversation_output,
         }
         return response

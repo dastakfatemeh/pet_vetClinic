@@ -13,6 +13,7 @@
 
 ## 📚 Table of Contents
 - [Overview](#overview)
+- [Architecture](#architecture)
 - [Components](#components)
 - [Installation](#installation)
 - [Usage](#usage)
@@ -26,6 +27,46 @@ This project implements a comprehensive pet health analysis system with three ma
 1. A classification model using VetBERTDx transformer for symptom classification
 2. A vector database system for efficient symptom similarity search and retrieval
 3. A T5 LLM model to explain clinical terms in simple language
+
+## 🏭 Architecture
+
+**📊 For the full architecture diagram and system design documentation, see [experiments/overview_diagram.md](./experiments/overview_diagram.md)** (Mermaid diagrams render on GitHub).
+
+This multi-agent AI system uses three specialized agents orchestrated through a FastAPI gateway, plus a **triage agent backed by a decision model** (dotted box) added in v2. The triage agent runs at the same time as the classifier and decides, through an escalation gate, whether the classifier's answer can be shown to the owner. See [experiments/README.md](./experiments/README.md) for the idea and results.
+
+```
+User ──► FastAPI  POST /converse
+                 │
+        ┌────────┴──────────────────────┐   both run at the same time
+        ▼                               ▼
+Classification Agent          ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
+(fine-tuned VetBERTDx)        ╎ Triage Agent (new in v2)         ╎
+        │                     ╎ asks a decision model:           ╎
+        │                     ╎ emergency? which condition?      ╎
+        │                     ╎ Clef 27B (default)               ╎
+        │                     ╎ Clef-flash | Jev  (TRIAGE_MODEL) ╎
+        │                     └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘
+        │                               │
+        └───────────────┬───────────────┘
+                        ▼
+                 Escalation gate ──► urgent-care message (emergency)
+                        │        ──► offer an appointment (out of scope,
+                        │            disagreement, low confidence)
+                        ▼  no rule fires
+        Retrieval Agent (VetBERT + Qdrant)
+                        ▼
+        Communication Agent (T5)
+                        ▼
+             Response with findings
+```
+
+**Key Technologies:**
+- **Classification**: VetBERTDx for symptom categorization
+- **Retrieval**: TopK-PercPos hard negative mining with Qdrant vector database
+- **Communication**: T5 model for clinical term simplification
+- **Triage (v2)**: decision model (Clef 27B on Cloudflare Workers AI by default; Clef-flash or Jev via `TRIAGE_MODEL`) for emergency and out-of-scope checks
+- **API Framework**: FastAPI with async support
+- **Deployment**: Docker (Qdrant), HuggingFace Hub (models)
 
 ## 🔧 Components
 
@@ -84,6 +125,42 @@ HUGGING_FACE_TOKEN=your_huggingface_token_here
 - Keep HuggingFace token secure
 - Add `.env` to `.gitignore`
 
+### Triage Model (optional)
+`/converse` runs a triage check beside VetBERTDx. It flags emergencies, sends out-of-scope messages to an appointment, and overrules the classifier when the triage model is confident it is wrong. The triage model is chosen in `.env`:
+
+```plaintext
+# Pick one: clef (default) | clef-flash | jev | none
+TRIAGE_MODEL=clef
+
+# clef / clef-flash on Cloudflare Workers AI (default provider)
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_API_TOKEN=...      # token with Workers AI permission
+
+# jev: TypeSafe API (paid, typesafe-sdk, Python >= 3.10)
+# TYPESAFE_API_KEY=...
+
+# or clef / clef-flash on your own GPU server with a SystemOne route (e.g. SGLang)
+# TRIAGE_PROVIDER=self_hosted
+# CLEF_BASE_URL=http://gpu-box:30000
+# CLEF_API_KEY=...            # optional
+
+# Optional overrides of the model's default thresholds
+# TRIAGE_EMERGENCY_THRESHOLD=0.7
+# TRIAGE_DISAGREEMENT_THRESHOLD=0.5
+```
+
+| `TRIAGE_MODEL` | Served by | Emergency threshold | Disagreement threshold | Notes |
+|---|---|---|---|---|
+| `clef` (default) | Workers AI ($0.24 per M input tokens after a free daily allowance) or self-hosted (80 GB GPU) | 0.5 | 0.5 | Free open weights; matched Jev in the evaluation |
+| `clef-flash` | Workers AI ($0.038 per M input tokens) or self-hosted (24 GB GPU) | 0.8 | 0.5 | Budget option, weaker check on the classifier |
+| `jev` | TypeSafe API | 0.5 | 0.8 | Paid per token |
+
+The thresholds come from [experiments/decider](./experiments/decider/README.md). The Clef values are provisional: they were chosen on the evaluation messages and still need checking on real traffic and review by a veterinarian.
+
+If the triage model is not configured, or a request fails or times out (3 s, 2 retries), `/converse` logs a warning and falls back to the classifier's 0.8 confidence check. The selected model is reported as `triage.model` in each response.
+
+**Getting Cloudflare credentials (free):** copy the account ID from the Cloudflare dashboard, then create an API token under My Profile → API Tokens using the **"Workers AI" template**. It grants only Workers AI Read and Edit; don't give the token any other permissions, and set an expiry. Clef and Clef-flash on Workers AI were verified live on 2026-11-22 (see [experiments/README.md](./experiments/README.md#running-it) for the full local setup).
+
 ### Qdrant Setup
 ```bash
 # Pull Qdrant image
@@ -92,6 +169,8 @@ docker pull qdrant/qdrant
 # Run container
 docker run -p 6333:6333 -d --name qdrant qdrant/qdrant
 ```
+
+Then run `Vector_DB.ipynb` once to embed the clinical notes and load them into the `vet_notes` collection. Without this step, `/converse` finds no similar cases.
 
 ## 💻 Usage
 
