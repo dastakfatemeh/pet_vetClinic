@@ -192,7 +192,7 @@ async def startup_event():
         communication_agent = CommunicationAgent(summarization_model, summarization_tokenizer, device)
 
         # Triage (emergency + out-of-scope checks) is optional; the pipeline runs without it.
-        # TRIAGE_MODEL picks the decision model (jev, clef, clef-flash or none); see Agents/triage_config.py
+        # TRIAGE_MODEL picks the decision model (clef, clef-flash, d1, jev or none); see Agents/triage_config.py
         try:
             settings: Optional[TriageSettings] = load_triage_settings()
             if settings is None:

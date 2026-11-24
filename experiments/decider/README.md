@@ -1,14 +1,19 @@
 # Jev vs. open-weight deciders: Triage Comparison
 
-Jev ([TypeSafe](https://docs.typesafe.ai)) is the triage model in `/converse` (see [the Jev experiment](../jev/README.md)), and it is a paid API. This experiment checks whether a free, open-weight decision model can replace it. Three candidates have been tested, all Apache-2.0 and built on Qwen:
+Jev ([TypeSafe](https://docs.typesafe.ai)) is the triage model in `/converse` (see [the Jev experiment](../jev/README.md)), and it is a paid API. This experiment checks whether a free or cheaper decision model can replace it. Six candidates have been tested:
 
 | Model | Size | Base | Notes |
 |---|---|---|---|
 | [`perplexity-ai/pplx-decider-v1-27b`](https://huggingface.co/perplexity-ai/pplx-decider-v1-27b) | 27B | Qwen3.8-27B | One question per forward pass |
 | [`Cloudflare/clef`](https://huggingface.co/Cloudflare/clef) | 27B | Qwen3.8-27B | Jev-compatible request format; also hosted on Workers AI ([blog](https://blog.cloudflare.com/clef-decision-models/)) |
 | [`Cloudflare/clef-flash`](https://huggingface.co/Cloudflare/clef-flash) | 9.4B | Qwen3.5-9B | Same as Clef, small enough for a 24 GB GPU |
+| Liquid AI `d1` (hosted) | Not disclosed | Not disclosed | Closed weights, Liquid AI API only, Jev-compatible request format ([blog](https://www.liquid.ai/blog/d1-decision-model)) |
+| [`LiquidAI/d1-3B`](https://huggingface.co/LiquidAI/d1-3B) | 3.1B | LFM2.5-VL-3B | Open weights under the LFM Open License v1.0; fits a 6 GB GPU |
+| [`LiquidAI/d1-2B`](https://huggingface.co/LiquidAI/d1-2B) | 1.9B | LFM3-VL-2B | d1-3B's successor, same license; fits a 4 GB GPU |
 
-All three answer the same question types as Jev (`choice` with probabilities, and `noul` yes/no probabilities), so each one gets the Jev experiment's 7 questions and can replace Jev inside `Agents/TriageAgent.py`.
+pplx-decider and the Clef models are Apache-2.0. The d1 results are in [their own section](#liquid-ai-d1-added-2026-11-23).
+
+All six answer the same question types as Jev (`choice` with probabilities, and `noul` yes/no probabilities), so each one gets the Jev experiment's 7 questions and can replace Jev inside `Agents/TriageAgent.py`.
 
 ## Short answer
 
@@ -17,6 +22,8 @@ All three answer the same question types as Jev (`choice` with probabilities, an
 - **Classification:** it is the most accurate decision model on both labelled sets (0.845 val, 0.835 clinical) and has the best-calibrated probabilities of any model tested, VetBERTDx included.
 - **Checking VetBERTDx:** with a 0.5 disagreement threshold it matches Jev exactly on validation (9 wrong answers shown, 82% answered).
 - **Hosting:** it's on Workers AI at $0.24 per million input tokens, so no GPU is needed. We verified the hosted endpoint live on 2026-11-22: it matches the open weights on 97% of labels and on every hard-case emergency ([Workers AI verification](#workers-ai-verification)).
+
+**Liquid AI's hosted d1** (added 2026-11-23) is about as good as Clef and the cheapest option ($0.02 per million input tokens), but its weights are closed. Its small open models, d1-3B and d1-2B, are too weak for this task ([details](#liquid-ai-d1-added-2026-11-23)).
 
 **pplx-decider** is as safe, but weaker at checking VetBERTDx and slower. **Clef-flash** is the cheapest option, but it over-flags emergencies at the 0.5 threshold. It needs its emergency threshold raised to 0.8, and it lets more of VetBERTDx's mistakes through.
 
@@ -126,14 +133,91 @@ Every label difference was on a message where the open weights were already unsu
 
 Small differences like these are expected from different serving hardware and numeric precision. None of them changed a safety outcome on the hard cases. The whole check used about 280k input tokens in one day (including a first hard-cases-only run of Clef), inside the free daily allowance.
 
+## Liquid AI d1 (added 2026-11-23)
+
+Liquid AI publishes a hosted decision model, `d1`, and two small open-weight ones, `d1-3B` and `d1-2B`. All three take Jev's question schema, so they got the same 7 questions as Clef, with state `{"owner_message": text}`, on the same 445 messages.
+- **Hosted d1** was called through Liquid AI's API with `run_d1.py`. It returned Jev's exact `{model, answers, usage}` format, with no envelope.
+- **d1-3B and d1-2B** ran on HF Jobs `a10g-small` (A10G 24 GB) with `run_d1_open.py`, using the models' own `system_one()` code.
+
+| Run | Where | Time | Cost |
+|---|---|---|---|
+| Hosted d1, 445 messages | Liquid AI API | 19 s | $0.0059 (297k input tokens) |
+| d1-3B + d1-2B, 445 messages | HF Jobs `6b051b08ca8b51043c3b268c` | 193 s | ~$0.05 |
+| Smoke test (3 messages) | HF Jobs, `l4x1` | 92 s | ~$0.02 |
+
+### As a classifier
+| Set | Model | Accuracy | Macro F1 | Calibration error ↓ | Accepted at 0.8 | Accuracy when accepted |
+|---|---|---|---|---|---|---|
+| val | Jev | 0.810 | 0.830 | 0.118 | 84.5% | 0.905 |
+| val | Clef | 0.845 | 0.848 | 0.035 | 68.5% | 0.905 |
+| val | **d1 (hosted)** | 0.830 | 0.835 | **0.033** | 64.5% | **0.915** |
+| val | d1-3B | 0.680 | 0.739 | 0.084 | 47.5% | 0.895 |
+| val | d1-2B | 0.755 | 0.780 | 0.068 | 36.0% | 0.875 |
+| clinical | Jev | 0.805 | 0.870 | 0.121 | 76.0% | 0.961 |
+| clinical | Clef | **0.835** | **0.880** | **0.045** | 69.5% | **0.986** |
+| clinical | **d1 (hosted)** | 0.810 | 0.862 | 0.052 | 59.0% | 0.983 |
+| clinical | d1-3B | 0.630 | 0.738 | 0.113 | 25.0% | 0.980 |
+| clinical | d1-2B | 0.725 | 0.814 | 0.126 | 25.0% | 0.980 |
+
+Hosted d1 sits between Jev and Clef as a classifier, with the best calibration on validation. The small open models are much less accurate and much less sure of themselves: d1-3B picks "none of these" for 32% of the clinical notes, which all have one of the five conditions.
+
+### Safety checks (hard cases)
+| Check | Jev | Clef | d1 (hosted) | d1-3B | d1-2B |
+|---|---|---|---|---|---|
+| Emergencies flagged (≥ 0.5) | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 |
+| False emergency alarms (≥ 0.5) | 0 / 33 | 1 / 33 | 1 / 33 | 1 / 33 | 1 / 33 |
+| Lowest score given to a real emergency | 0.92 | 0.95 | 0.87 | 0.89 | **0.50** |
+| Emergency flag rate on routine val messages | 13% | 14% | 17.5% | 12.5% | 9.5% |
+| Slang / typos correct | 6 / 6 | 5 / 6 | 6 / 6 | 3 / 6 | 3 / 6 |
+| Multi-condition labels found (per-condition yes/no) | 100% | 93% | 100% | 100% | 100% |
+| Hard cases handled correctly by the decision model alone (0.8 gate) | 42 / 45 | 38 / 45 | 40 / 45 | 35 / 45 | 30 / 45 |
+
+| Emergency threshold | d1 (hosted) | d1-3B | d1-2B |
+|---|---|---|---|
+| 0.5 | 12/12, 1 FA, val 17.5% | 12/12, 1 FA, val 12.5% | 12/12, 1 FA, val 9.5% |
+| 0.6 | 12/12, 0 FA, val 14% | 12/12, 1 FA, val 10% | 11/12, 0 FA, val 6% |
+| 0.7 | 12/12, 0 FA, val 10% | 12/12, 1 FA, val 9% | 11/12, 0 FA, val 4% |
+| 0.8 | 12/12, 0 FA, val 6% | 12/12, 0 FA, val 7% | 10/12, 0 FA, val 2% |
+
+Hosted d1 is as safe as Clef. d1-2B scored one real emergency at exactly 0.50, so it would miss it at any higher threshold and is not safe to rely on.
+
+### VetBERTDx behind each d1 model
+| Triage model | Val answered | Val accuracy | Val wrong shown | Clinical answered | Clinical accuracy | Clinical wrong shown |
+|---|---|---|---|---|---|---|
+| None (v1) | 93.5% | 0.909 | 17 | 74.0% | 0.872 | 19 |
+| Jev @0.8 | 82.5% | 0.945 | 9 | 66.0% | 0.947 | 7 |
+| Clef @0.5 | 82.0% | 0.945 | 9 | 65.0% | 0.954 | 6 |
+| d1 @0.8 | 89.5% | 0.911 | 16 | 68.0% | 0.934 | 9 |
+| **d1 @0.5** | 83.5% | 0.940 | 10 | 66.0% | 0.947 | 7 |
+| d1-3B @0.8 | 75.0% | 0.920 | 12 | 56.5% | 0.912 | 10 |
+| d1-3B @0.5 | 69.5% | 0.928 | 10 | 52.0% | 0.962 | 4 |
+| d1-2B @0.8 | 82.0% | 0.909 | 15 | 63.5% | 0.921 | 10 |
+| d1-2B @0.5 | 77.0% | 0.922 | 12 | 60.0% | 0.958 | 5 |
+
+Hosted d1 at 0.5 is within one wrong answer of Clef and Jev on both sets. d1-3B's 4 wrong clinical answers look good, but only because it sends almost half the messages to an appointment: it says "none of these" so often that it blocks right answers along with wrong ones.
+
+### Cost and latency
+| | d1 (hosted) | d1-3B | d1-2B |
+|---|---|---|---|
+| Weights | Closed | LFM Open License v1.0 | LFM Open License v1.0 |
+| Hosted API | Liquid AI, $0.02 per M input tokens | none | none |
+| Self-hosted GPU (peak memory, BF16) | n/a | 5.9 GiB | 3.6 GiB |
+| Tokens per message (7 questions) | ~670 | ~640 | ~670 |
+| Median latency | 138 ms (network round trip, 7 questions) | 48 ms (A10G, 2 questions) | 36 ms (A10G, 2 questions) |
+
+d1's tokenizer uses about 40% fewer tokens than Jev's or Clef's for the same messages, which adds to its low price. The price comes from the `usage.cost` field in Liquid's own responses ($0.00001334 for 667 tokens). The LFM license is not Apache-2.0: read it before commercial use. The d1-3B model card already lists d1-2B as its newer version.
+
 ## Verdict
 - **Replace Jev with Clef** if the goal is to drop TypeSafe. Call it on Workers AI with a 0.5 disagreement threshold, and consider an emergency threshold of 0.7–0.8 after veterinary review. It matched or beat Jev on everything measured here.
 - **Clef-flash** is the budget option, about 6× cheaper on Workers AI and able to run on a 24 GB GPU. It needs an emergency threshold of 0.8, and it shows 14 wrong validation answers against Jev's 9.
 - **pplx-decider** works, but it has no hosted API, needs an 80 GB GPU, and checks VetBERTDx less well than Clef.
+- **Liquid AI's hosted d1** is the cheapest option and about as good as Clef (`TRIAGE_MODEL=d1`, verified live 2026-11-23). Clef stays the default because its weights are open, so it can be self-hosted or moved between providers.
+- **d1-3B and d1-2B** fit on a small GPU, but they are too unsure for this task, and d1-2B nearly missed an emergency. Not recommended.
 
 ## Next steps
 - [x] Check the Workers AI Clef endpoint on a sample, to confirm hosted probabilities match the open weights and to measure real latency (2026-11-22, see above)
 - [x] Make `TriageAgent` backend-agnostic (TypeSafe, Workers AI or self-hosted) behind the same `TriageResult`. Chosen with `TRIAGE_MODEL`, Clef by default
+- [x] Evaluate Liquid AI's d1 (hosted, d1-3B, d1-2B) and add hosted d1 as `TRIAGE_MODEL=d1` (2026-11-23)
 - [ ] Validate the 0.5 disagreement and 0.7–0.8 emergency thresholds on fresh messages, written by someone other than the author of the hard cases
 - [ ] Test the self-hosted path (`TRIAGE_PROVIDER=self_hosted`, SGLang `/v1/systemone`). It is implemented but has not been run
 - [ ] Have a veterinarian review the emergency threshold and the cases the models disagree on
@@ -154,9 +238,11 @@ Small differences like these are expected from different serving hardware and nu
 | `run_clef.py` | Clef and Clef-flash inference (self-contained `uv` script, pinned to the card's tested torch 2.11 and transformers 5.10.2) |
 | `compare_deciders.py` | Export inputs and score results locally. No API calls |
 | `verify_workers_ai.py` | Live check of Clef and Clef-flash on Cloudflare Workers AI against the HF Jobs results |
+| `run_d1.py` | Hosted d1 on all messages through Liquid AI's API (needs `LIQUID_API_KEY`) |
+| `run_d1_open.py` | d1-3B and d1-2B inference (self-contained `uv` script, transformers 5.24) |
 
 **Question wording:**
-- Clef gets the Jev questions verbatim, with state `{"owner_message": text}`.
+- Clef and all d1 models get the Jev questions verbatim, with state `{"owner_message": text}`.
 - pplx-decider takes the message as plain text after `State:`, so its questions say "the message in State" instead of `` `owner_message` ``.
 - The condition descriptions are identical for all models.
 
@@ -191,6 +277,26 @@ python experiments/decider/compare_deciders.py report \
 - **No token needed:** all three models are public. The "unauthenticated requests" warning is harmless, and downloads ran at about 2 GB/s.
 - **Bucket:** the local folder is synced to the `jobs-artifacts` bucket in your HF account.
 - **Without HF Jobs:** on any machine with a big enough GPU, run the same scripts with `uv run` and the local `--inputs` path.
+
+### Liquid AI d1
+```bash
+# Hosted d1 (needs LIQUID_API_KEY in .env; ~$0.006 for all 445 messages)
+python experiments/decider/run_d1.py
+
+# d1-3B and d1-2B (fit on l4x1 or a10g-small)
+hf jobs uv run --detach --flavor a10g-small --timeout 45m -v ./experiments/decider:/work \
+    experiments/decider/run_d1_open.py --inputs /work/inputs/texts.csv \
+    --model LiquidAI/d1-3B --model LiquidAI/d1-2B
+PYTHONIOENCODING=utf-8 hf jobs logs <d1-job-id> > experiments/decider/inputs/d1_open_job.log
+
+python experiments/decider/compare_deciders.py report \
+    --pred clef=experiments/decider/inputs/clef_job.log \
+    --pred d1=experiments/decider/inputs/d1_predictions.csv \
+    --pred d13b=experiments/decider/inputs/d1_open_job.log \
+    --pred d12b=experiments/decider/inputs/d1_open_job.log
+```
+
+`l4x1` GPUs can take a while to become available. On 2026-11-23 a job waited over 20 minutes, so `a10g-small` (same 24 GB, $1.00/h) was used instead.
 
 ### Workers AI check
 Needs `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` in `.env`. Create the token with Cloudflare's "Workers AI" template, which grants only Workers AI Read and Edit. It also needs the saved inputs and `clef_job.log` from the steps above.

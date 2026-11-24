@@ -27,6 +27,11 @@ class TestLoadSettings:
         assert settings.provider == "workers_ai"
         assert (settings.emergency_threshold, settings.disagreement_threshold) == (emergency, disagreement)
 
+    def test_d1_preset(self):
+        settings = load_triage_settings({"TRIAGE_MODEL": "d1", "LIQUID_API_KEY": "lq-key"})
+        assert (settings.model, settings.provider, settings.liquid_api_key) == ("d1", "liquid", "lq-key")
+        assert (settings.emergency_threshold, settings.disagreement_threshold) == (0.5, 0.5)
+
     @pytest.mark.parametrize("value", ["none", "off", "disabled"])
     def test_can_turn_off(self, value):
         assert load_triage_settings({"TRIAGE_MODEL": value}) is None
@@ -43,6 +48,7 @@ class TestLoadSettings:
             {"TRIAGE_MODEL": "gpt"},
             {"TRIAGE_MODEL": "jev", "TRIAGE_PROVIDER": "workers_ai"},
             {"TRIAGE_MODEL": "clef", "TRIAGE_PROVIDER": "typesafe"},
+            {"TRIAGE_MODEL": "d1", "TRIAGE_PROVIDER": "workers_ai"},
             {"TRIAGE_MODEL": "jev", "TRIAGE_EMERGENCY_THRESHOLD": "high"},
             {"TRIAGE_DISAGREEMENT_THRESHOLD": "1.5"},
         ],
@@ -78,6 +84,18 @@ class TestBuildBackend:
         settings = load_triage_settings({"TRIAGE_MODEL": "clef", "TRIAGE_PROVIDER": "self_hosted"})
         with pytest.raises(AgentInitializationError):
             build_backend(settings, {})
+
+    def test_liquid_url_and_auth(self):
+        settings = load_triage_settings({"TRIAGE_MODEL": "d1", "LIQUID_API_KEY": "lq-key"})
+        backend = build_backend(settings, {})
+        assert isinstance(backend, SystemOneHTTPBackend)
+        assert backend.url == "https://api.liquid.ai/decisions/v1/systemone"
+        assert backend.model == "d1"
+        assert backend.client.headers["Authorization"] == "Bearer lq-key"
+
+    def test_liquid_needs_api_key(self):
+        with pytest.raises(AgentInitializationError):
+            build_backend(load_triage_settings({"TRIAGE_MODEL": "d1"}), {})
 
     def test_jev_needs_api_key(self):
         with pytest.raises(AgentInitializationError):
