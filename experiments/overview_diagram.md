@@ -4,7 +4,7 @@
 
 v2 adds a **Triage Agent** that runs at the same time as the classifier in `/converse`. It asks a decision model two questions: "is this an emergency?" and "which of the five conditions, or none of these?". An escalation gate then decides whether the classifier's answer can be shown to the owner. The classification, retrieval and communication agents are unchanged from v1 (described in the sections below).
 
-The decision model is chosen with `TRIAGE_MODEL` in `.env` (`Agents/triage_config.py`). **Clef on Cloudflare Workers AI is the default**, and was verified live on 2026-11-22. Background and results are in [experiments/README.md](./README.md).
+The decision model is chosen with `TRIAGE_MODEL` in `.env` (`Agents/triage_config.py`). **Clef on Cloudflare Workers AI is the default**, and was verified live on 2026-11-22. Liquid AI's hosted d1 was added as an option on 2026-11-23. Background and results are in [experiments/README.md](./README.md).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Helvetica, Arial, sans-serif", "fontSize": "14px", "primaryColor": "#ffffff", "primaryTextColor": "#1e293b", "primaryBorderColor": "#94a3b8", "lineColor": "#64748b", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1", "edgeLabelBackground": "#ffffff"}, "flowchart": {"curve": "basis", "nodeSpacing": 40, "rankSpacing": 55, "padding": 14}}}%%
@@ -23,9 +23,12 @@ flowchart TB
         CLEF["<b>Clef 27B</b> · TRIAGE_MODEL=clef<br/><b>default</b> · open weights (Apache-2.0)<br/>Workers AI (verified live) or self-hosted<br/>emergency 0.5 · disagreement 0.5 (provisional)"]
         FLASH["<b>Clef-flash 9.4B</b> · TRIAGE_MODEL=clef-flash<br/>budget option · Workers AI (verified live)<br/>or self-hosted on a 24 GB GPU<br/>emergency 0.8 · disagreement 0.5 (provisional)"]
         JEV["<b>Jev</b> · TRIAGE_MODEL=jev<br/>TypeSafe API · paid per token<br/>emergency 0.5 · disagreement 0.8"]
+        D1["<b>d1</b> · TRIAGE_MODEL=d1<br/>Liquid AI API (verified live) · closed weights<br/>$0.02 per M input tokens<br/>emergency 0.5 · disagreement 0.5 (provisional)"]
         PPLX["<b>pplx-decider 27B</b> · open weights<br/>evaluated offline only · not selectable<br/>self-host only · 80 GB GPU"]
+        D1OPEN["<b>d1-3B / d1-2B</b> · open weights (LFM license)<br/>evaluated offline only · not selectable<br/>fit a 6–8 GB GPU · weaker than hosted d1"]
         CLEF ~~~ JEV
-        FLASH ~~~ PPLX
+        FLASH ~~~ D1
+        PPLX ~~~ D1OPEN
     end
 
     GATE("<b>Escalation gate</b> · first rule that fires<br/>1 · emergency ≥ model's threshold → emergency<br/>2 · decider says 'none of these' → out_of_scope<br/>3 · decider ≥ model's threshold on another condition → model_disagreement<br/>4 · classifier below 0.8 → low_confidence<br/>Rules 1–3 are skipped when triage returns None or TRIAGE_MODEL=none")
@@ -72,8 +75,8 @@ flowchart TB
     class CA,RA,CMA v1
     class TA,GATE new
     class CLEF recommended
-    class FLASH,JEV option
-    class PPLX evaluated
+    class FLASH,JEV,D1 option
+    class PPLX,D1OPEN evaluated
     class EMG danger
     class UNC,NOCASE warn
     class OK success
@@ -127,7 +130,7 @@ flowchart TB
   - `emergency`: yes/no probability that the pet should see a vet within hours
   - `condition`: choice over the five conditions plus "none of these"
 - Two backends behind the same `TriageAgent` / `TriageResult`:
-  - `SystemOneHTTPBackend`: Clef and Clef-flash on Cloudflare Workers AI or a self-hosted SystemOne server (httpx; handles Cloudflare's `{"result": ...}` envelope)
+  - `SystemOneHTTPBackend`: Clef and Clef-flash on Cloudflare Workers AI or a self-hosted SystemOne server, and d1 on Liquid AI's API (httpx; handles Cloudflare's `{"result": ...}` envelope)
   - `TypeSafeBackend`: Jev through `typesafe-sdk` (Python ≥ 3.10)
 - 3 s timeout and 2 retries; any failure returns `None`, and the gate falls back to v1 behaviour
 
@@ -135,10 +138,11 @@ flowchart TB
 
 | Variable | Values | Default |
 |---|---|---|
-| `TRIAGE_MODEL` | `clef`, `clef-flash`, `jev`, `none` | `clef` |
+| `TRIAGE_MODEL` | `clef`, `clef-flash`, `d1`, `jev`, `none` | `clef` |
 | `TRIAGE_PROVIDER` | `workers_ai`, `self_hosted` (Clef models) | `workers_ai` |
 | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Workers AI credentials ("Workers AI" token template) | — |
 | `CLEF_BASE_URL`, `CLEF_API_KEY` | Self-hosted server | — |
+| `LIQUID_API_KEY` | d1 | — |
 | `TYPESAFE_API_KEY` | Jev | — |
 | `TRIAGE_EMERGENCY_THRESHOLD`, `TRIAGE_DISAGREEMENT_THRESHOLD` | Override the model's thresholds | Model presets below |
 | `TRIAGE_TIMEOUT_SECONDS` | Per-request timeout | 3 |
@@ -147,9 +151,10 @@ flowchart TB
 |---|---|---|
 | `clef` | 0.5 | 0.5 |
 | `clef-flash` | 0.8 | 0.5 |
+| `d1` | 0.5 | 0.5 |
 | `jev` | 0.5 | 0.8 |
 
-The Clef thresholds are provisional: they were chosen on the evaluation messages in [decider/README.md](./decider/README.md).
+The Clef and d1 thresholds are provisional: they were chosen on the evaluation messages in [decider/README.md](./decider/README.md).
 
 ---
 
@@ -261,6 +266,12 @@ _deduplicate_numbered_sections(text: str) -> str
 - **Endpoint**: `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/cloudflare/{model}`
 - **Pricing**: free daily allowance, then $0.24 (Clef) or $0.038 (Clef-flash) per million input tokens
 - **Verified live** on 2026-11-22: 97–98% label agreement with the open weights, 12/12 hard-case emergencies
+
+#### 💧 Liquid AI API (optional, new in v2)
+- **Model**: hosted `d1`, used when `TRIAGE_MODEL=d1`
+- **Endpoint**: `https://api.liquid.ai/decisions/v1/systemone` (same request and response format as Jev, no envelope)
+- **Pricing**: $0.02 per million input tokens
+- **Verified live** on 2026-11-23: all 445 evaluation messages, 12/12 hard-case emergencies
 
 #### 🧠 TypeSafe API (optional)
 - **Model**: Jev, used when `TRIAGE_MODEL=jev`; paid per token
@@ -434,7 +445,7 @@ else:
 | **Web Framework** | FastAPI | RESTful API server |
 | **ML Framework** | PyTorch | Model inference |
 | **Transformers** | HuggingFace | Pre-trained models |
-| **Decision model** | Clef / Clef-flash on Cloudflare Workers AI; Jev on TypeSafe (optional) | Triage: emergency and out-of-scope checks |
+| **Decision model** | Clef / Clef-flash on Cloudflare Workers AI; d1 on Liquid AI or Jev on TypeSafe (optional) | Triage: emergency and out-of-scope checks |
 | **HTTP client** | httpx | Calls to the decision model |
 | **Vector DB** | Qdrant | Similarity search |
 | **Containerization** | Docker | Qdrant deployment |
@@ -489,7 +500,7 @@ docker run -p 6333:6333 -d qdrant/qdrant
 
 # Configure .env (git-ignored)
 HUGGING_FACE_TOKEN=...
-TRIAGE_MODEL=clef               # clef (default) | clef-flash | jev | none
+TRIAGE_MODEL=clef               # clef (default) | clef-flash | d1 | jev | none
 CLOUDFLARE_ACCOUNT_ID=...
 CLOUDFLARE_API_TOKEN=...        # "Workers AI" token template
 
@@ -500,7 +511,7 @@ uvicorn AI_Agents:app --reload
 http://127.0.0.1:8000/docs
 ```
 
-Everything except the decision model runs locally on CPU (~1 GB of model downloads, 2–3 GB of memory). Clef runs on Cloudflare; self-hosting it needs an 80 GB GPU (24 GB for Clef-flash). Full instructions: [README.md](./README.md#running-it).
+Everything except the decision model runs locally on CPU (~1 GB of model downloads, 2–3 GB of memory). Clef runs on Cloudflare (d1 on Liquid AI); self-hosting Clef needs an 80 GB GPU (24 GB for Clef-flash). Full instructions: [README.md](./README.md#running-it).
 
 ### Production Considerations
 - [ ] GPU optimization (CUDA support)
@@ -684,7 +695,7 @@ curl -X POST "http://127.0.0.1:8000/converse" \
 - **Author**: [dastakfatemeh](https://github.com/dastakfatemeh)
 - **Repository**: [pet_vetClinic](https://github.com/dastakfatemeh/pet_vetClinic)
 - **Dataset**: Kaggle Pet Health Symptoms Dataset
-- **Models**: HuggingFace community models; Clef and Clef-flash by Cloudflare (Apache-2.0)
+- **Models**: HuggingFace community models; Clef and Clef-flash by Cloudflare (Apache-2.0); d1 by Liquid AI
 
 ---
 

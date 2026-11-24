@@ -4,20 +4,22 @@ and the thresholds that go with it.
 
 Environment variables (read from .env at startup):
 
-    TRIAGE_MODEL                  clef (default) | clef-flash | jev | none
+    TRIAGE_MODEL                  clef (default) | clef-flash | d1 | jev | none
     TRIAGE_PROVIDER               For clef / clef-flash: workers_ai (default) | self_hosted
+                                  (jev always uses typesafe, d1 always uses liquid)
 
     TYPESAFE_API_KEY              jev: TypeSafe API key (read by typesafe-sdk)
     CLOUDFLARE_ACCOUNT_ID         workers_ai: Cloudflare account ID
     CLOUDFLARE_API_TOKEN          workers_ai: API token with Workers AI permission
     CLEF_BASE_URL                 self_hosted: base URL of a SystemOne-compatible server (POST {url}/v1/systemone)
     CLEF_API_KEY                  self_hosted: optional bearer token
+    LIQUID_API_KEY                d1: Liquid AI API key
 
     TRIAGE_EMERGENCY_THRESHOLD    Optional override of the model's emergency threshold
     TRIAGE_DISAGREEMENT_THRESHOLD Optional override of the model's disagreement threshold
     TRIAGE_TIMEOUT_SECONDS        Per-request timeout (default 3)
 
-Default thresholds come from experiments/decider/README.md. The Clef values were chosen on the same
+Default thresholds come from experiments/decider/README.md. The Clef and d1 values were chosen on the same
 445 evaluation messages, so treat them as provisional until they are checked on fresh traffic.
 """
 
@@ -30,6 +32,7 @@ from .TriageAgent import SystemOneHTTPBackend, TriageAgent, TypeSafeBackend
 
 DEFAULT_MODEL = "clef"  # free weights; cheap on Workers AI. Set TRIAGE_MODEL=jev to use TypeSafe instead
 WORKERS_AI_URL = "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/cloudflare/{model}"
+LIQUID_URL = "https://api.liquid.ai/decisions/v1/systemone"
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,9 @@ PRESETS = {
     "clef-flash": ModelPreset(
         emergency_threshold=0.8, disagreement_threshold=0.5, providers=("workers_ai", "self_hosted")
     ),
+    # Liquid AI d1 (hosted, closed weights): 12/12 emergencies and 1/33 false alarms at 0.5; like Clef, catches
+    # the classifier's mistakes best at a 0.5 disagreement threshold
+    "d1": ModelPreset(emergency_threshold=0.5, disagreement_threshold=0.5, providers=("liquid",)),
 }
 
 
@@ -62,6 +68,7 @@ class TriageSettings:
     cloudflare_api_token: Optional[str] = None
     clef_base_url: Optional[str] = None
     clef_api_key: Optional[str] = None
+    liquid_api_key: Optional[str] = None
 
 
 def _float(env: Mapping[str, str], key: str, default: float) -> float:
@@ -101,6 +108,7 @@ def load_triage_settings(env: Optional[Mapping[str, str]] = None) -> Optional[Tr
         cloudflare_api_token=env.get("CLOUDFLARE_API_TOKEN") or None,
         clef_base_url=env.get("CLEF_BASE_URL") or None,
         clef_api_key=env.get("CLEF_API_KEY") or None,
+        liquid_api_key=env.get("LIQUID_API_KEY") or None,
     )
 
 
@@ -134,6 +142,12 @@ def build_backend(settings: TriageSettings, env: Optional[Mapping[str, str]] = N
         url = settings.clef_base_url.rstrip("/") + "/v1/systemone"
         headers = {"Authorization": f"Bearer {settings.clef_api_key}"} if settings.clef_api_key else None
         return SystemOneHTTPBackend(url, settings.model, headers=headers, timeout=settings.timeout)
+
+    if settings.provider == "liquid":
+        if not settings.liquid_api_key:
+            raise AgentInitializationError("LIQUID_API_KEY must be set to use d1 (or choose another TRIAGE_MODEL)")
+        headers = {"Authorization": f"Bearer {settings.liquid_api_key}"}
+        return SystemOneHTTPBackend(LIQUID_URL, settings.model, headers=headers, timeout=settings.timeout)
 
     raise AgentInitializationError(f"Unknown triage provider {settings.provider!r}")
 

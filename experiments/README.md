@@ -7,7 +7,7 @@ The classifier stays the primary model. The decision model only decides when the
 | Folder | Question it answers |
 |---|---|
 | [`jev/`](./jev/README.md) | Does a decision model (Jev, TypeSafe's paid API) add anything to the fine-tuned classifier? |
-| [`decider/`](./decider/README.md) | Can a free, open-weight decision model (pplx-decider, Clef, Clef-flash) replace Jev? |
+| [`decider/`](./decider/README.md) | Can a free or cheaper decision model (pplx-decider, Clef, Clef-flash, Liquid AI d1) replace Jev? |
 
 The architecture with the new triage layer is drawn in [`overview_diagram.md`](./overview_diagram.md).
 
@@ -30,7 +30,7 @@ A decision model answers typed questions with probabilities: a yes/no probabilit
 | Classification | [`fdastak/model_classification`](https://huggingface.co/fdastak/model_classification) (BERT-base, 108M) | Fine-tuned by the repo owner from [`havocy28/VetBERTDx`](https://huggingface.co/havocy28/VetBERTDx), itself VetBERT trained on 39 veterinary diagnosis classes | **Yes**: 800 owner observations, 5 conditions (`Clean_Classification.ipynb`) |
 | Retrieval | [`havocy28/VetBERT`](https://huggingface.co/havocy28/VetBERT) embeddings + Qdrant | havocy28 | No |
 | Communication | [`google/flan-t5-base`](https://huggingface.co/google/flan-t5-base) | Google | No |
-| **Triage (new)** | [`Cloudflare/clef`](https://huggingface.co/Cloudflare/clef) by default; also Clef-flash or Jev | Cloudflare / TypeSafe | No, zero-shot with short condition descriptions |
+| **Triage (new)** | [`Cloudflare/clef`](https://huggingface.co/Cloudflare/clef) by default; also Clef-flash, Liquid AI d1 or Jev | Cloudflare / Liquid AI / TypeSafe | No, zero-shot with short condition descriptions |
 
 ## Agents: before and after
 
@@ -39,7 +39,7 @@ A decision model answers typed questions with probabilities: a yes/no probabilit
 | Classification Agent | Fine-tuned VetBERTDx | Unchanged |
 | Retrieval Agent | VetBERT + Qdrant | Unchanged |
 | Communication Agent | Flan-T5-base | Unchanged |
-| **Triage Agent** | None | **New**: runs at the same time as the classifier. The model is chosen in `.env` with `TRIAGE_MODEL` (`clef` by default, or `clef-flash`, `jev`, `none`) |
+| **Triage Agent** | None | **New**: runs at the same time as the classifier. The model is chosen in `.env` with `TRIAGE_MODEL` (`clef` by default, or `clef-flash`, `d1`, `jev`, `none`) |
 | Escalation gate | 1 rule: classifier confidence below 0.8 → offer an appointment | 4 rules, first match wins (below) |
 | If triage is unavailable | n/a | Logs a warning and behaves exactly like `main` |
 
@@ -85,19 +85,22 @@ The trade-off: about 11% more messages get an appointment offer instead of an an
 "Clinical notes" are 200 clinical-style notes from the same dataset that the classifier was never trained on. They test a different writing style. The 45 hard cases cover emergencies, out-of-scope questions, several conditions at once, slang and typos, negation, non-English and long messages.
 
 ### Choosing the decision model
-| | Jev | Clef 27B | Clef-flash 9.4B | pplx-decider 27B |
-|---|---|---|---|---|
-| Emergencies flagged | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 |
-| False alarms at the 0.5 emergency threshold | 0 / 33 | 1 / 33 | 4 / 33 | 1 / 33 |
-| Validation: wrong answers shown (best threshold) | 9 | **9** | 14 | 10 |
-| Accuracy as a classifier (val / clinical) | 0.810 / 0.805 | **0.845 / 0.835** | 0.845 / 0.820 | 0.790 / 0.755 |
-| Calibration error, val (lower is better) | 0.118 | **0.035** | 0.061 | 0.112 |
-| Weights | Closed | Apache-2.0 | Apache-2.0 | Apache-2.0 |
-| Hosted option | TypeSafe, paid per token | Workers AI, $0.24 per M input tokens | Workers AI, $0.038 per M input tokens | None |
-| Self-hosting | n/a | 80 GB GPU | 24 GB GPU | 80 GB GPU |
-| Default thresholds (emergency / disagreement) | 0.5 / 0.8 | 0.5 / 0.5 | 0.8 / 0.5 | — |
+| | Jev | Clef 27B | Clef-flash 9.4B | Liquid AI d1 | pplx-decider 27B | d1-3B / d1-2B |
+|---|---|---|---|---|---|---|
+| Emergencies flagged | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 | 12 / 12 |
+| False alarms at the 0.5 emergency threshold | 0 / 33 | 1 / 33 | 4 / 33 | 1 / 33 | 1 / 33 | 1 / 33 |
+| Validation: wrong answers shown (best threshold) | 9 | **9** | 14 | 10 | 10 | 10 / 12 |
+| Clinical notes: wrong answers shown (best threshold) | 7 | **6** | 8 | 7 | 4 | 4 / 5, but they answer only 52–60% |
+| Accuracy as a classifier (val / clinical) | 0.810 / 0.805 | **0.845 / 0.835** | 0.845 / 0.820 | 0.830 / 0.810 | 0.790 / 0.755 | 0.680 / 0.630 and 0.755 / 0.725 |
+| Calibration error, val (lower is better) | 0.118 | 0.035 | 0.061 | **0.033** | 0.112 | 0.084 / 0.068 |
+| Weights | Closed | Apache-2.0 | Apache-2.0 | Closed | Apache-2.0 | LFM Open License |
+| Hosted option | TypeSafe, paid per token | Workers AI, $0.24 per M input tokens | Workers AI, $0.038 per M input tokens | Liquid AI, **$0.02 per M input tokens** | None | None |
+| Self-hosting | n/a | 80 GB GPU | 24 GB GPU | n/a | 80 GB GPU | 6 GB / 4 GB GPU |
+| Default thresholds (emergency / disagreement) | 0.5 / 0.8 | 0.5 / 0.5 | 0.8 / 0.5 | 0.5 / 0.5 | — | — |
 
 Clef matched Jev on safety and on catching the classifier's mistakes, and it is the best-calibrated model tested. It is free to self-host and cheap to call on Workers AI, so it is the default. The open models were evaluated on Hugging Face Jobs (A100 80GB) for about $1.30 in total. Full numbers and methods are in [`decider/README.md`](./decider/README.md).
+
+Liquid AI's hosted d1, added on 2026-11-23, is about as good as Clef and the cheapest option. It is offered as `TRIAGE_MODEL=d1`, but Clef stays the default because d1's weights are closed. The small open d1-3B and d1-2B fit on a laptop-class GPU, but they are too unsure for this task: they send about half the clinical notes to an appointment, and d1-2B scored one real emergency at only 0.50. The whole d1 evaluation cost about $0.08.
 
 ## Observations on the classifier (for the repo owner)
 
@@ -114,6 +117,7 @@ Clef matched Jev on safety and on catching the classifier's mistakes, and it is 
 - A veterinarian has not reviewed the hard-case labels, the emergency flags or the urgent-care wording.
 - Clef was evaluated with its open weights on HF Jobs, then checked live on Workers AI on 95 messages. The hosted model agreed on 97% of labels and on every hard-case emergency, but it is not bit-for-bit identical ([details](./decider/README.md#workers-ai-verification)).
 - The self-hosted path (`TRIAGE_PROVIDER=self_hosted`) is implemented but has not been run.
+- Liquid AI's d1 price ($0.02 per M input tokens) comes from the cost reported in its own API responses. Hosted d1 is closed, so Liquid can change it at any time.
 
 ## Running it
 
@@ -125,6 +129,7 @@ Clef 27B needs about 52 GB of GPU memory, so it does **not** run on a laptop. It
 | **Clef on Workers AI (default)** | Free Cloudflare account, account ID and a "Workers AI" API token | Free daily allowance, then $0.24 per M input tokens | ✅ Verified live |
 | Clef-flash on Workers AI | Same, plus `TRIAGE_MODEL=clef-flash` | About 6× cheaper | ✅ Verified live |
 | Clef self-hosted | A rented 80 GB GPU (24 GB for Clef-flash) running SGLang, plus `TRIAGE_PROVIDER=self_hosted` and `CLEF_BASE_URL` | ~$2–3/hour while running | Implemented, not run |
+| Liquid AI d1 | `TRIAGE_MODEL=d1` and a Liquid AI API key (`LIQUID_API_KEY`) | $0.02 per M input tokens, about 12× cheaper than Clef | ✅ Verified live |
 | Jev | `TRIAGE_MODEL=jev` and a TypeSafe API key (Python ≥ 3.10) | Paid per token | ✅ Used in the Jev experiment |
 | No triage | `TRIAGE_MODEL=none` | Free | Same behaviour as `main` |
 
@@ -140,7 +145,7 @@ Everything except the triage model runs on the local machine, on CPU: about 1 GB
 5. Create `.env` in the project root. It is git-ignored, so never commit it:
    ```plaintext
    HUGGING_FACE_TOKEN=...
-   TRIAGE_MODEL=clef                 # clef (default) | clef-flash | jev | none
+   TRIAGE_MODEL=clef                 # clef (default) | clef-flash | d1 | jev | none
    CLOUDFLARE_ACCOUNT_ID=...
    CLOUDFLARE_API_TOKEN=...
    ```
@@ -151,4 +156,4 @@ The app has no user interface; the Swagger page at `/docs` is the way to try it.
 
 ### Reproducing the experiments
 - [`jev/README.md`](./jev/README.md) needs a TypeSafe key.
-- [`decider/README.md`](./decider/README.md) needs a GPU with 24–80 GB, or Hugging Face Jobs (about $1.30 for every model). The Workers AI check needs only the Cloudflare keys.
+- [`decider/README.md`](./decider/README.md) needs a GPU with 24–80 GB, or Hugging Face Jobs (about $1.40 for every model). The Workers AI check needs only the Cloudflare keys, and hosted d1 needs only a Liquid AI key.

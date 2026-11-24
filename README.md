@@ -44,7 +44,8 @@ Classification Agent          ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌�
         │                     ╎ asks a decision model:           ╎
         │                     ╎ emergency? which condition?      ╎
         │                     ╎ Clef 27B (default)               ╎
-        │                     ╎ Clef-flash | Jev  (TRIAGE_MODEL) ╎
+        │                     ╎ Clef-flash | d1 | Jev            ╎
+        │                     ╎ (chosen by TRIAGE_MODEL)         ╎
         │                     └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘
         │                               │
         └───────────────┬───────────────┘
@@ -64,7 +65,7 @@ Classification Agent          ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌�
 - **Classification**: VetBERTDx for symptom categorization
 - **Retrieval**: TopK-PercPos hard negative mining with Qdrant vector database
 - **Communication**: T5 model for clinical term simplification
-- **Triage (v2)**: decision model (Clef 27B on Cloudflare Workers AI by default; Clef-flash or Jev via `TRIAGE_MODEL`) for emergency and out-of-scope checks
+- **Triage (v2)**: decision model (Clef 27B on Cloudflare Workers AI by default; Clef-flash, Liquid AI d1 or Jev via `TRIAGE_MODEL`) for emergency and out-of-scope checks
 - **API Framework**: FastAPI with async support
 - **Deployment**: Docker (Qdrant), HuggingFace Hub (models)
 
@@ -135,12 +136,15 @@ HUGGING_FACE_TOKEN=your_huggingface_token_here
 `/converse` runs a triage check beside VetBERTDx. It flags emergencies, sends out-of-scope messages to an appointment, and overrules the classifier when the triage model is confident it is wrong. The triage model is chosen in `.env`:
 
 ```plaintext
-# Pick one: clef (default) | clef-flash | jev | none
+# Pick one: clef (default) | clef-flash | d1 | jev | none
 TRIAGE_MODEL=clef
 
 # clef / clef-flash on Cloudflare Workers AI (default provider)
 CLOUDFLARE_ACCOUNT_ID=...
 CLOUDFLARE_API_TOKEN=...      # token with Workers AI permission
+
+# d1: Liquid AI API (hosted, closed weights)
+# LIQUID_API_KEY=...
 
 # jev: TypeSafe API (paid, typesafe-sdk, Python >= 3.10)
 # TYPESAFE_API_KEY=...
@@ -159,13 +163,16 @@ CLOUDFLARE_API_TOKEN=...      # token with Workers AI permission
 |---|---|---|---|---|
 | `clef` (default) | Workers AI ($0.24 per M input tokens after a free daily allowance) or self-hosted (80 GB GPU) | 0.5 | 0.5 | Free open weights; matched Jev in the evaluation |
 | `clef-flash` | Workers AI ($0.038 per M input tokens) or self-hosted (24 GB GPU) | 0.8 | 0.5 | Budget option, weaker check on the classifier |
+| `d1` | Liquid AI API ($0.02 per M input tokens) | 0.5 | 0.5 | Cheapest; about as good as Clef, but closed weights |
 | `jev` | TypeSafe API | 0.5 | 0.8 | Paid per token |
 
-The thresholds come from [experiments/decider](./experiments/decider/README.md). The Clef values are provisional: they were chosen on the evaluation messages and still need checking on real traffic and review by a veterinarian.
+The thresholds come from [experiments/decider](./experiments/decider/README.md). The Clef and d1 values are provisional: they were chosen on the evaluation messages and still need checking on real traffic and review by a veterinarian.
 
 If the triage model is not configured, or a request fails or times out (3 s, 2 retries), `/converse` logs a warning and falls back to the classifier's 0.8 confidence check. The selected model is reported as `triage.model` in each response.
 
 **Getting Cloudflare credentials (free):** copy the account ID from the Cloudflare dashboard, then create an API token under My Profile → API Tokens using the **"Workers AI" template**. It grants only Workers AI Read and Edit; don't give the token any other permissions, and set an expiry. Clef and Clef-flash on Workers AI were verified live on 2026-11-22 (see [experiments/README.md](./experiments/README.md#running-it) for the full local setup).
+
+**Getting a Liquid AI key (for `d1`):** sign up at [liquid.ai/en/api](https://www.liquid.ai/en/api), create a key in the console, and set `LIQUID_API_KEY`. d1 was verified live on 2026-11-23.
 
 ### Qdrant Setup
 ```bash
